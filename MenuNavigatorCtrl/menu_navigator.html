@@ -1,0 +1,164 @@
+<html>
+    <body onload="init();">     
+
+    <script>
+        let g_data = {};
+        var g_menuImage = null;
+        var g_menuBuilderCanvas = null;
+        var g_offscreenCanvas = null;
+
+        const LabelFillStyle = "rgba(255, 255, 0, 0.8";
+        const LabelBorderStyle = "#000000";
+
+        let g_markedArea = {x:0, y:0, w:0, h:0};
+
+        window.onmessage = (event) => {
+                let eventData = event.data;
+                if(eventData.msg === 'setImage') {   
+                    g_menuImage = null;
+                    updateGraphics();     
+                                
+                    g_menuImage = new Image(); 
+                    g_menuImage.src = eventData.src
+                    g_menuImage.onload = () => {
+                        updateGraphics();
+                    }                  
+                } else if(eventData.msg === 'markArea') {
+                    g_markedArea = eventData.markArea;
+                    updateGraphics();
+                } else if(eventData.msg === 'clearMarkArea') {
+                    g_markedArea = {x:0, y:0, w:0, h:0};
+                    updateGraphics();
+                }
+        }
+
+        function init() {
+            g_menuBuilderCanvas = document.getElementById('menuBuilder');
+            g_menuBuilderCanvas.onmousemove = ((event) => {
+                let rc = g_menuBuilderCanvas.getBoundingClientRect();
+                g_mouseX = event.clientX - rc.left;
+                g_mouseY = event.clientY - rc.top;
+            });
+
+            g_menuBuilderCanvas.width = 1500;
+
+            g_offscreenCanvas = document.createElement('canvas');
+            g_offscreenCanvas.getContext('2d').translate(-.5, -.5);
+           
+            updateGraphics();
+        }
+
+        function updateData(data) {
+            g_data = data;
+            updateGraphics();
+        }
+
+        function drawMenuImage(canvas) {
+            if(g_menuImage !== null) {
+                let ctx = canvas.getContext('2d');
+                ctx.drawImage(g_menuImage, 0, 0);
+            }
+        }
+
+        function drawLabel(canvas, text, x, y, width, height, txtFill, bgStroke, bgFill) {
+            let ctx = canvas.getContext('2d');
+            let spacing = 5;
+            ctx.save();
+            ctx.textAlign = 'start';
+            ctx.font = 'small-caption';
+            let txtWidth = ctx.measureText(text).width;
+
+            width = txtWidth > width ? txtWidth + spacing * 2 : width;
+            if (width + x > canvas.width) {
+                x = canvas.width - width;
+            }
+
+            ctx.beginPath();
+            ctx.fillStyle = bgFill;
+            ctx.strokeStyle = bgStroke;
+            ctx.fillRect(x, y, width, height);
+            ctx.strokeRect(x, y, width, height);
+
+            ctx.beginPath();
+            ctx.fillStyle = txtFill;
+            ctx.textAlign = 'start top';
+
+            ctx.fillText(text, x + spacing, y + 14);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawFrame(canvas, x, y, width, height, bgStroke, bgFill) {
+            let ctx = canvas.getContext('2d');
+            ctx.beginPath();
+            ctx.fillStyle = bgFill;
+            ctx.strokeStyle = bgStroke;
+            ctx.fillRect(x, y, width, height);
+            ctx.strokeRect(x, y, width, height);
+            ctx.restore();
+        }
+
+        function drawText(canvas, text, x, y) {
+            let fillStyle = "rgba(255, 0, 0, " + 0 + ")";
+            let strokeStyle = "rgba(0, 0, 0, " + 1.0 + ")";
+            drawLabel(canvas, text, x, y, 0, 0, strokeStyle, "#00000000", fillStyle); 
+        }        
+
+        function updateGraphics() {
+            g_offscreenCanvas.width = g_menuBuilderCanvas.width;
+            g_offscreenCanvas.height = g_menuBuilderCanvas.height;
+            let ctx = g_offscreenCanvas.getContext("2d");
+            ctx.clearRect(0, 0, g_offscreenCanvas.width, g_offscreenCanvas.height);
+            ctx.translate(.5, .5); //required to make the lines sharp
+
+            //draw background:
+            ctx.save();
+            ctx.lineWidth = 1;
+            ctx.fillStyle = "#e0e0e0";
+            ctx.fillRect(0, 0, g_offscreenCanvas.width, g_offscreenCanvas.height);
+            ctx.restore();
+
+            ctx.save();
+            drawMenuImage(g_offscreenCanvas);
+            ctx.restore();
+
+            //draw grid:
+            ctx.beginPath();
+            let graphRes = 10;
+            for (let i = 0; i < graphRes; i++) {
+                ctx.moveTo(0, i * g_offscreenCanvas.height / graphRes);
+                ctx.lineTo(g_offscreenCanvas.width, i * g_offscreenCanvas.height / graphRes);
+
+                ctx.moveTo(i * g_offscreenCanvas.width / graphRes, 0);
+                ctx.lineTo(i * g_offscreenCanvas.width / graphRes, g_offscreenCanvas.height);
+            }
+            ctx.fillStyle = "#ffffff";
+            ctx.strokeStyle = "#0000ff3c";
+            ctx.stroke();
+            ctx.restore();
+
+            //draw label:
+            let text = "Menu Renderer v0.1";
+            drawText(g_offscreenCanvas, text, 10, 10); 
+
+            drawFrame(g_offscreenCanvas, g_markedArea.x, g_markedArea.y, g_markedArea.w, g_markedArea.h, "#000000","#00ff003c");
+
+            //bitblt offscreen canvas on main canvas:            
+            // g_menuBuilderCanvas.getContext('2d').drawImage(g_offscreenCanvas, 0, 0);
+            if(g_menuImage !== null) {
+                g_menuBuilderCanvas.getContext('2d').drawImage(g_offscreenCanvas, 0, 0, g_menuImage.width, g_menuImage.height, 0, 0, g_offscreenCanvas.width, g_offscreenCanvas.height);
+            } else {
+                g_menuBuilderCanvas.getContext('2d').drawImage(g_offscreenCanvas, 0, 0);
+            }
+        }
+
+
+
+    </script>
+
+    
+    <canvas id="menuBuilder" width="1400" height="2000" style="position:fixed; left:0; top: 0; transform: scale(0.1, 0.1); transform-origin: top left;"></canvas>
+   
+    
+    </body>
+</html>
