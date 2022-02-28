@@ -1,0 +1,265 @@
+<html>
+    <head>
+        <style>
+            td {
+                font: 12px arial;
+                padding: 5px;
+            }
+        
+            .classifyButton {
+                color: white;
+                background: black;
+                border: 1px solid gray;
+                cursor:pointer;
+                border-radius: 2px;
+                padding: 0;
+                margin: 0;                
+                width: 100%;
+                height: 100%;             
+            }
+
+            .classifyButton:disabled {
+                color: white;
+                background: gray;
+                border: 1px solid gray;
+                border-radius: 2px;
+                cursor:default;
+                padding: 0;
+                margin: 0;                
+                width: 100%;
+                height: 100%;             
+            }
+
+            .suggestButton {
+                color: lightgreen;
+                background: black;
+                border: 1px solid gray;
+                border-radius: 2px;
+                cursor:pointer;
+                padding: 0;
+                margin: 0;                
+                width: 100%;
+                height: 100%;
+            }
+
+            .suggestButton:disabled {
+                color: lightgray;
+                background: gray;
+                border: 1px solid gray;
+                border-radius: 2px;
+                cursor:default;
+                padding: 0;
+                margin: 0;                
+                width: 100%;
+                height: 100%;
+            }
+
+            .divBut40 {                       
+                padding: 0;
+                margin: 0;
+                width: 40px;
+                height: 22px;
+            }            
+
+            .divBut80 {                
+                padding: 0;
+                margin: 0;
+                width: 80px;
+                height: 22px;
+            }            
+
+            .imgThumbnail {
+                border: 1px solid black;
+                border-radius: 5px;
+                width: 100px;
+                height: 100px;
+            }
+
+            .suggestionDiv {                
+                color: green;                                
+            }
+
+            .toolbarDiv {      
+                position: fixed;
+                top: 0;                
+                z-index: 1000;          
+                border: 2px solid gray;
+                border-radius: 2px;
+                background: lightgray;
+                width: 95%;
+            }
+
+            #mainToolbar {
+                /* position: fixed;
+                top: 0;
+                width: 99%;
+                z-index: 100;
+                padding-bottom: 40px; */
+            }
+
+            #mainDiv {                
+                padding-top: 40px; 
+                height: 590px;
+                overflow:auto;               
+            }
+
+            .tdSuggestSelected {
+                width:120px;
+                height: 22px;
+            }
+
+            .fixedHeightContainer {
+                width:100%;
+                height:100%;
+            }
+
+        </style>
+        <script>
+            let g_state = {
+                multiSelect: new Set(),                
+            }
+
+            let g_data={};
+            window.onmessage = (event) => {
+                let eventData = event.data;
+
+                if(eventData.msg === 'scrollToTop') {
+                    let elem = document.getElementById('mainDiv');
+                    elem.scrollTo(0, 0);
+                    // document.body.scrollTop = 0; // For Safari
+                    // document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+                    console.log("Recieved scrollToTop message");
+                }
+                else if(eventData.msg === 'setCatalogData') {
+                    if(eventData.params !== undefined && eventData.params.scrollToTop !== undefined && eventData.params.scrollToTop === true) {
+                        let elem = document.getElementById('mainDiv');
+                        elem.scrollTo(0, 0);
+                    }
+                    g_data = eventData.data;
+                    g_state.multiSelect.clear();
+                    renderMainToolbar();
+                    generateTableRows();
+                } else if(eventData.msg === 'suggest') {                 
+                    document.getElementById(`suggestion_${eventData.data.productId}`).innerHTML = `${eventData.data.suggestion}`;                    
+                } else if(eventData.msg === 'suggestMultiDone') {
+                    let suggestion = eventData.data.suggestion;
+                    let data =eventData.data.data;
+                    data.forEach(e => {
+                        document.getElementById(`suggestion_${e.productId}`).innerHTML = `${suggestion}`;
+                    })
+                }
+            }        
+
+            function drawButtons(row, idx) {
+                let confirmButton = `<button id="confirmButton_${row.productId}" class="classifyButton" onclick='confirm(${idx}, "true")'>Yes</button>`;
+                let unConfirmButton = `<button title ="Click to un-confirm and allow suggestion" id="unConfirmButton_${row.productId}" class="classifyButton" onclick='confirm(${idx}, "false")'>No</button>`;
+                let suggestButton = `<button id="suggestButton_${row.productId}" class="suggestButton" onclick='suggest(${idx})'>Suggest...</button>`;
+
+                return `<table with="80"><tbody><tr><td class="divBut40">${confirmButton}</td><td class="divBut40">${unConfirmButton}</td></tr><tr><td colspan="2" class="divBut80">${suggestButton}</td></tr></tbody></table>`;                              
+            }
+
+            function generateTableRows(data) {
+                let tableRowsHtml = g_data.map((row, i) => {
+                    return `<tr><td><input id="checkbox_${i}" type="checkbox" onclick='onCheck(${i})'/></td><td><a href="${row.link}" target="_blank"><img class="imgThumbnail" src="${row.thumbnail}" title="${row.description}"/></a></td><td width="100">${drawButtons(row, i)}</td><td><div>${row.category}</div><div id="suggestion_${row.productId}" class="suggestionDiv"/></td><td>${row.title}</td><td>${row.productId}</td></tr>`;
+                })                
+                document.getElementById("mainDiv").innerHTML = renderMainTable();
+                document.getElementById("mainTable").innerHTML = tableRowsHtml.join('');                
+            }            
+
+            function confirm(idx, v) {
+                g_data[idx].confirmed = v;               
+
+                let confirmButton = document.getElementById(`confirmButton_${g_data[idx].productId}`);
+                confirmButton.disabled = true;
+
+                let unConfirmButton = document.getElementById(`unConfirmButton_${g_data[idx].productId}`);
+                unConfirmButton.disabled = true;
+
+                if(v === 'true') {
+                    confirmButton.setAttribute('style', 'border:3px solid darkgreen;');
+                } else {
+                    unConfirmButton.setAttribute('style', "border:3px solid darkgreen;");
+                }
+
+                let msg = {msg: 'confirm', data:g_data[idx]};
+
+                window.parent.postMessage(msg, "*");
+            }
+
+            function suggest(idx) {
+                let msg = {msg: 'suggest', data:g_data[idx]};
+                window.parent.postMessage(msg, "*");
+            }
+
+            function toggleRowButtons(idx, state) {
+                let suggestButton = document.getElementById(`suggestButton_${g_data[idx].productId}`);
+                suggestButton.disabled = state;
+
+                let confirmButton = document.getElementById(`confirmButton_${g_data[idx].productId}`);
+                confirmButton.disabled = state;
+
+                let unConfirmButton = document.getElementById(`unConfirmButton_${g_data[idx].productId}`);
+                unConfirmButton.disabled = state;
+            }
+
+            function onCheck(idx) {
+                let checkbox = document.getElementById(`checkbox_${idx}`);
+                checkbox.checked ? g_state.multiSelect.add(idx) : g_state.multiSelect.delete(idx);                 
+                toggleRowButtons(idx, checkbox.checked);
+                renderMainToolbar();
+            }
+
+            function updateSuggestMultiButton() {
+                let element = document.getElementById('suggestMultiButton');
+                let count = g_state.multiSelect.size;
+                element.innerText = `Suggest (${count})...`;
+            }
+
+            function onMainCheckboxClick() {
+                let mainCheckbox = document.getElementById('mainCheckbox');
+                if(mainCheckbox.checked) {
+                    g_data.forEach((element, i) => {
+                        document.getElementById(`checkbox_${i}`).checked = true;
+                        toggleRowButtons(i, true);
+                        g_state.multiSelect.add(i);
+                    });              
+                    updateSuggestMultiButton();      
+                } else {
+                    g_data.forEach((element, i) => {
+                        document.getElementById(`checkbox_${i}`).checked = false;  
+                        toggleRowButtons(i, false);                      
+                    });
+                    g_state.multiSelect.clear();
+                    renderMainToolbar();
+                }
+            }
+
+            function suggestMulti() {
+                let msg = {
+                    msg: "suggestMulti",
+                    data: Array.from(g_state.multiSelect).map(i => g_data[i]),
+                }
+                window.parent.postMessage(msg, "*");
+            }
+
+            function renderMainTable() {
+                if(g_data.length > 0) {
+                    return `<table><tbody id="mainTable"></tbody></table>`;
+                } else {
+                    return ``;
+                }
+            }
+
+            function renderMainToolbar() {                
+                let html = g_state.multiSelect.size > 0 ? `<div class="toolbarDiv"><table width="100%"><tbody><tr><td width="135"><input id="mainCheckbox" type="checkbox" onclick="onMainCheckboxClick()"/></td><td class="tdSuggestSelected"><button id="suggestMultiButton" class="suggestButton" onclick="suggestMulti()">Suggest (${g_state.multiSelect.size})...</button></td><td><button disabled>Yes</button></td><td><button disabled>No</button></td></tr></tbody></table></div>` : ``;
+                document.getElementById('mainToolbar').innerHTML = html;
+            }
+        </script>
+    </head>
+    <body>
+        <div class="fixedHeightContainer">
+        <div id="mainToolbar"></div>
+        <div id="mainDiv"></div>
+        </div>
+    </body>
+</html>
