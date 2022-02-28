@@ -55,6 +55,20 @@
                 }
             });
 
+            g_menuBuilderCanvas.onmouseup = ((event) => {
+                if(g_areasData !== null && g_menuImage !== null) {                                   
+                    let i = areaIndexFromMousePos();
+                    if( i > -1 ) {                        
+                        let msg = {
+                            msg: 'areaSelected',
+                            areaData: g_areasData[i]
+                        }
+                        console.log(`mouseup selected id: ${msg.areaData.id}`);
+                        window.parent.postMessage(msg, "*");
+                    }
+                }
+            });
+
             // g_menuBuilderCanvas.width = 1500;
 
             g_offscreenCanvas = document.createElement('canvas');
