@@ -14,16 +14,24 @@
 
         let g_markedArea = {x:0, y:0, w:0, h:0};
 
+        let g_wordsInfo = [];
+
+        let g_screenPartitions = []; //array of rectangles
+
         window.onmessage = (event) => {
                 let eventData = event.data;
                 if(eventData.msg === 'setImage') {   
                     g_menuImage = null;
-                    updateGraphics();     
+                    updateGraphics();   
+
+                    window.parent.postMessage({msg:'imageUnloaded'}, '*');  
                                 
                     g_menuImage = new Image(); 
                     g_menuImage.src = eventData.src
                     g_menuImage.onload = () => {
+                        initScreenPartitions();
                         updateGraphics();
+                        window.parent.postMessage({msg:'imageLoaded'}, '*');
                     }                  
                 } else if(eventData.msg === 'markArea') {
                     g_markedArea = eventData.markArea;
@@ -36,6 +44,10 @@
                     updateGraphics();      
                 } else if(eventData.msg === 'clearAllAreas') {
                     g_areasData = null;
+                    g_wordsInfo = [];
+                    updateGraphics();
+                } else if(eventData.msg === 'setWordsInfo') {
+                    g_wordsInfo = eventData.wordsInfo;
                     updateGraphics();
                 }
         }
@@ -50,7 +62,9 @@
                     let ry = g_menuImage.height / rc.bottom;
                     g_mouseX = (event.clientX - rc.left) * rx;
                     g_mouseY = (event.clientY - rc.top) * ry;  
-                    // console.log(`rx:${rx} ry:${ry} mouseX:${g_mouseX} mouseY:${g_mouseY}\n`);              
+                    
+                    let parIdx = partitionIndexFromMousePos();
+                    console.log(`screen partition id:${parIdx}`);              
                     updateGraphics();
                 }
             });
@@ -92,6 +106,64 @@
             }
             return -1;
         }
+
+        function wordsInfoIndicesFromMousePos() {
+            //TODO: Implement an optimized search using the partitions...
+            let res = [];
+            if(g_wordsInfo !== null) {
+                for(let i=0; i<g_wordsInfo.length; i++) {
+                    if(
+                        g_mouseX > g_wordsInfo[i].poly.x &&
+                        g_mouseX < g_wordsInfo[i].poly.x + g_wordsInfo[i].poly.w &&
+                        g_mouseY > g_wordsInfo[i].poly.y &&
+                        g_mouseY < g_wordsInfo[i].poly.y + g_wordsInfo[i].poly.h
+                    ) {
+                        res.push(i);
+                    }
+                }
+            }
+            return res;
+        
+        }
+
+        function initScreenPartitions() {
+            g_screenPartitions = [];
+            let partWidth = 500;
+            let partHeight = 500;
+
+            let parCountX = g_menuImage.width / partWidth + 1;
+            let parCountY = g_menuImage.height / partHeight + 1;
+
+            partWidth = g_menuImage.width / parCountX;
+            partHeight = g_menuImage.height / parCountY;
+
+
+            for(let j=0; j<parCountY; j++) {
+                for(let i=0; i<parCountX; i++) {
+                    let x = i*partWidth;
+                    let y = j*partHeight;
+                    g_screenPartitions.push({x, y, w:partWidth, h:partHeight});
+                }
+            }
+        }
+
+        function partitionIndexFromMousePos() {
+            for(let i=0; i<g_screenPartitions.length; i++) {
+                if(
+                    g_mouseX > g_screenPartitions[i].x &&
+                    g_mouseX < g_screenPartitions[i].x + g_screenPartitions[i].w &&
+                    g_mouseY > g_screenPartitions[i].y &&
+                    g_mouseY < g_screenPartitions[i].y + g_screenPartitions[i].h
+                    ) {
+                        return i;
+                    }
+            }
+        }
+
+
+
+
+        /// Drawing functionality
 
         function drawMenuImage(canvas) {
             if(g_menuImage !== null) {
@@ -162,33 +234,41 @@
             drawMenuImage(g_offscreenCanvas);
             ctx.restore();
 
-            //draw grid:
-            ctx.beginPath();
-            let graphRes = 0;
-            for (let i = 0; i < graphRes; i++) {
-                ctx.moveTo(0, i * g_offscreenCanvas.height / graphRes);
-                ctx.lineTo(g_offscreenCanvas.width, i * g_offscreenCanvas.height / graphRes);
-
-                ctx.moveTo(i * g_offscreenCanvas.width / graphRes, 0);
-                ctx.lineTo(i * g_offscreenCanvas.width / graphRes, g_offscreenCanvas.height);
+            //draw partitions:
+            ctx.save();
+            for (let i = 0; i < g_screenPartitions.length; i++) {
+                //drawFrame(g_offscreenCanvas, g_screenPartitions[i].x+1, g_screenPartitions[i].y+1, g_screenPartitions[i].w-2, g_screenPartitions[i].h-2, "#0000ffff", "#00000000")            
             }
-            ctx.fillStyle = "#ffffff";
-            ctx.strokeStyle = "#0000ff3c";
-            ctx.stroke();
             ctx.restore();
 
             //draw label:
             let text = "Menu Renderer v0.1";
             // drawText(g_offscreenCanvas, text, 10, 10); 
 
+            ctx.save();
+            //ctx.globalCompositeOperation = 'difference';
             drawFrame(g_offscreenCanvas, g_markedArea.x, g_markedArea.y, g_markedArea.w, g_markedArea.h, "#00ff003c","#00ff003c");
+            ctx.restore();
 
+            
             if(g_areasData !== null) {
+                ctx.save();
                 let i = areaIndexFromMousePos();
-                if(i > -1) {
-                    drawFrame(g_offscreenCanvas, g_areasData[i].x, g_areasData[i].y, g_areasData[i].w, g_areasData[i].h, "#0000ff3c","#0000ff3c");
+                if(i > -1) {                    
+                    //ctx.globalCompositeOperation = 'difference';
+                    drawFrame(g_offscreenCanvas, g_areasData[i].x, g_areasData[i].y, g_areasData[i].w, g_areasData[i].h, "#0000ff3c","#0000ff3c");                                       
                 }
+                ctx.restore(); 
             }
+
+            ctx.save();
+            let wi = wordsInfoIndicesFromMousePos();
+            for(let i=0; i<wi.length; i++) {
+                let idx = wi[i];
+                let wordInfoPoly = g_wordsInfo[idx].poly;
+                drawFrame(g_offscreenCanvas, wordInfoPoly.x, wordInfoPoly.y, wordInfoPoly.w, wordInfoPoly.h, "#ffff007e","#ffff007e");
+            }
+            ctx.restore();
 
             //bitblt offscreen canvas on main canvas:            
             // g_menuBuilderCanvas.getContext('2d').drawImage(g_offscreenCanvas, 0, 0);
