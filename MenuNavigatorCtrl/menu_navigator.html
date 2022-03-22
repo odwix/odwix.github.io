@@ -18,9 +18,18 @@
 
         let g_screenPartitions = []; //array of rectangles
 
+        let g_config = {
+            drawFullStats: false,
+            drawCursorLabels: false,
+            drawPartitions: false,
+        }
+
         window.onmessage = (event) => {
                 let eventData = event.data;
-                if(eventData.msg === 'setImage') {   
+                if(eventData.msg === 'setConfig') {
+                    g_config = eventData.config;
+                    updateGraphics();
+                } else if(eventData.msg === 'setImage') {   
                     g_menuImage = null;
                     updateGraphics();   
 
@@ -29,6 +38,8 @@
                     g_menuImage = new Image(); 
                     g_menuImage.src = eventData.src
                     g_menuImage.onload = () => {
+                      g_menuBuilderCanvas.width =g_menuImage.width;
+                      g_menuBuilderCanvas.height = g_menuImage.height;
                         initScreenPartitions();
                         updateGraphics();
                         window.parent.postMessage({msg:'imageLoaded'}, '*');
@@ -48,6 +59,8 @@
                     updateGraphics();
                 } else if(eventData.msg === 'setWordsInfo') {
                     g_wordsInfo = eventData.wordsInfo;
+                    //console.log(JSON.stringify(g_wordsInfo));
+                  
                     updateGraphics();
                 }
         }
@@ -62,9 +75,10 @@
                     let ry = g_menuImage.height / rc.bottom;
                     g_mouseX = (event.clientX - rc.left) * rx;
                     g_mouseY = (event.clientY - rc.top) * ry;  
+                    //console.log(`mouseX:${g_mouseX} mouseY:${g_mouseY}`);
                     
                     let parIdx = partitionIndexFromMousePos();
-                    console.log(`screen partition id:${parIdx}`);              
+                    //console.log(`screen partition id:${parIdx}`);              
                     updateGraphics();
                 }
             });
@@ -77,7 +91,7 @@
                             msg: 'areaSelected',
                             areaData: g_areasData[i]
                         }
-                        console.log(`mouseup selected id: ${msg.areaData.id}`);
+                        //console.log(`mouseup selected id: ${msg.areaData.id}`);
                         window.parent.postMessage(msg, "*");
                     }
                 }
@@ -174,16 +188,18 @@
 
         function drawLabel(canvas, text, x, y, width, height, txtFill, bgStroke, bgFill) {
             let ctx = canvas.getContext('2d');
-            let spacing = 5;
+            let xSpacing = 5;
+            let ySpacing = (height - 12) / 2;
+
             ctx.save();
             ctx.textAlign = 'start';
             ctx.font = 'small-caption';
             let txtWidth = ctx.measureText(text).width;
 
-            width = txtWidth > width ? txtWidth + spacing * 2 : width;
+            width = txtWidth > width ? txtWidth + xSpacing * 2 : width;
             if (width + x > canvas.width) {
                 x = canvas.width - width;
-            }
+            }            
 
             ctx.beginPath();
             ctx.fillStyle = bgFill;
@@ -195,7 +211,7 @@
             ctx.fillStyle = txtFill;
             ctx.textAlign = 'start top';
 
-            ctx.fillText(text, x + spacing, y + 14);
+            ctx.fillText(text, x + xSpacing, y + height - ySpacing);
             ctx.stroke();
             ctx.restore();
         }
@@ -235,15 +251,24 @@
             ctx.restore();
 
             //draw partitions:
-            ctx.save();
-            for (let i = 0; i < g_screenPartitions.length; i++) {
-                //drawFrame(g_offscreenCanvas, g_screenPartitions[i].x+1, g_screenPartitions[i].y+1, g_screenPartitions[i].w-2, g_screenPartitions[i].h-2, "#0000ffff", "#00000000")            
+            let  drawPartitions = g_config.drawPartitions;
+            if(drawPartitions) {
+                ctx.save();
+                for (let i = 0; i < g_screenPartitions.length; i++) {
+                    drawFrame(g_offscreenCanvas, g_screenPartitions[i].x+1, g_screenPartitions[i].y+1, g_screenPartitions[i].w-2, g_screenPartitions[i].h-2, "#0000ffff", "#00000000")            
+                }
+                ctx.restore();
             }
-            ctx.restore();
 
             //draw label:
             let text = "Menu Renderer v0.1";
             // drawText(g_offscreenCanvas, text, 10, 10); 
+
+            let rc = g_menuBuilderCanvas.getBoundingClientRect();
+            //console.log(`boundigRect:${JSON.stringify(rc)}`);
+            let rx = (g_menuImage !== null) ? g_menuImage.width / rc.right : 1;
+            let ry = (g_menuImage !== null) ? g_menuImage.height / rc.bottom : 1;
+            //console.log(`menuImageW:${(g_menuImage !== null) ? g_menuImage.width : -1} menuImageH:${(g_menuImage !== null) ? g_menuImage.height : -1} ratio: rx:${rx} ry:${ry} mouseX:${g_mouseX} mouseY:${g_mouseY}`);
 
             ctx.save();
             //ctx.globalCompositeOperation = 'difference';
@@ -261,12 +286,27 @@
                 ctx.restore(); 
             }
 
+
+            let drawFullStats = g_config.drawFullStats;
             ctx.save();
+            let words = [];
             let wi = wordsInfoIndicesFromMousePos();
             for(let i=0; i<wi.length; i++) {
                 let idx = wi[i];
                 let wordInfoPoly = g_wordsInfo[idx].poly;
                 drawFrame(g_offscreenCanvas, wordInfoPoly.x, wordInfoPoly.y, wordInfoPoly.w, wordInfoPoly.h, "#ffff007e","#ffff007e");
+                let w = drawFullStats ? `${g_wordsInfo[idx].word}(x:${wordInfoPoly.x} y:${wordInfoPoly.y} w:${wordInfoPoly.w} h:${wordInfoPoly.h})` : `${g_wordsInfo[idx].word}`;
+                words.push(w);
+                //console.log(`wordsInfoPoly[${idx}]: ${JSON.stringify(wordInfoPoly)}`);
+            }
+            
+            let drawCursorLabels = (g_config.drawCursorLabels) && (g_mouseX > 0  && g_mouseY > 0);
+            if(drawCursorLabels) {
+                if(words.length > 0) {
+                    drawLabel(g_offscreenCanvas, `(${parseInt(g_mouseX)},${parseInt(g_mouseY)}) ${words.join(" ")}`, g_mouseX, g_mouseY-22, 0, 22, "#000000ff", "#000000ff", "#ffffffff");
+                } else {
+                    drawLabel(g_offscreenCanvas, `(${parseInt(g_mouseX)},${parseInt(g_mouseY)})`, g_mouseX, g_mouseY-22, 0, 22, "#000000ff", "#000000ff", "#ffffffff");
+                }
             }
             ctx.restore();
 
@@ -277,6 +317,15 @@
             } else {
                 g_menuBuilderCanvas.getContext('2d').drawImage(g_offscreenCanvas, 0, 0);
             }
+
+            // let drawCursorLabels = true;
+            // if(drawCursorLabels && g_menuBuilderCanvas !== null) {
+            //     if(words.length > 0) {
+            //         drawText(g_menuBuilderCanvas, words.join(" "), g_mouseX, g_mouseY-14);
+            //     } else {
+            //         drawText(g_menuBuilderCanvas, `(${parseInt(g_mouseX)},${parseInt(g_mouseY)})`, g_mouseX, g_mouseY-14);
+            //     }
+            // }
         }
 
 
@@ -284,7 +333,7 @@
     </script>
 
     
-    <canvas id="menuBuilder" width="3600" height="5400" style="position:fixed; left:0; top: 0; transform: scale(0.1, 0.1); transform-origin: top left;"></canvas>
+    <canvas id="menuBuilder"style="position:fixed; left:0; top: 0; width:100%; height:100%; transform: scale(1, 1); transform-origin: top left;"></canvas>
    
     
     </body>
