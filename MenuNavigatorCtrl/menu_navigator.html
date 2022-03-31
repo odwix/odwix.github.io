@@ -8,6 +8,9 @@
         var g_offscreenCanvas = null;
         let g_mouseX = 0;
         let g_mouseY = 0;
+        let g_drawSelectionRectMode = false;
+        let g_selectionRectOrgX = 0;
+        let g_selectionRectOrgY = 0;
 
         const LabelFillStyle = "rgba(255, 255, 0, 0.8";
         const LabelBorderStyle = "#000000";
@@ -97,6 +100,24 @@
                 }
             });
 
+            g_menuBuilderCanvas.onpointerdown = (e) => {
+                g_drawSelectionRectMode = true;
+                g_selectionRectOrgX = g_mouseX;
+                g_selectionRectOrgY = g_mouseY;
+                g_menuBuilderCanvas.onpointermove = (e) => {
+                    updateGraphics(); 
+                };
+                g_menuBuilderCanvas.setPointerCapture(e.pointerId);
+                updateGraphics();
+            }
+
+            g_menuBuilderCanvas.onpointerup = (e) => {
+                g_drawSelectionRectMode = false;
+                g_menuBuilderCanvas.onpointermove = null;
+                g_menuBuilderCanvas.releasePointerCapture(e.pointerId);
+                updateGraphics();
+            }
+
             // g_menuBuilderCanvas.width = 1500;
 
             g_offscreenCanvas = document.createElement('canvas');
@@ -121,6 +142,20 @@
             return -1;
         }
 
+        function ptInRect(ptX, ptY, rcX, rcY, rceX, rceY) {
+            return (ptX >= rcX && ptX <= rceX) && (ptY >= rcY && ptY <= rceY);                
+        }
+
+        function rectIntersect(r1_x, r1_y, r1_cx, r1_cy, r2_x, r2_y, r2_cx, r2_cy) {
+            let intersection = !(
+                (r1_x > r2_cx)   ||
+                (r1_cx < r2_x)   ||
+                (r1_y > r2_cy)   ||
+                (r1_cy < r2_y)
+                );
+            return intersection;
+        }
+
         function wordsInfoIndicesFromMousePos() {
             //TODO: Implement an optimized search using the partitions...
             let res = [];
@@ -136,8 +171,55 @@
                     }
                 }
             }
+            return res;        
+        }
+
+        function wordsInfoIndicesFromBoundingRect(x, y, w, h) {
+            let res = [];
+            let cx = Math.min(x, x+w);
+            let cy = Math.min(y, y+h);
+            let ex = Math.max(x, x+w);
+            let ey = Math.max(y, y+h);
+            if(g_wordsInfo !== null) {
+                for(let i=0; i<g_wordsInfo.length; i++) {  
+                    if(rectIntersect (
+                        cx, cy,
+                        ex, ey,
+                        g_wordsInfo[i].poly.x, g_wordsInfo[i].poly.y,
+                        g_wordsInfo[i].poly.x+g_wordsInfo[i].poly.w, g_wordsInfo[i].poly.y+g_wordsInfo[i].poly.h)
+                        ) {
+                        res.push(i);
+                    }
+                }
+            }
             return res;
-        
+        }
+
+        function getSelectedWordsBoundingRect() {
+            let wi = wordsInfoIndicesFromBoundingRect(g_selectionRectOrgX, g_selectionRectOrgY, g_mouseX - g_selectionRectOrgX , g_mouseY - g_selectionRectOrgY);
+            let lastLeft = Number.MAX_SAFE_INTEGER;
+            let lastRight = Number.MIN_SAFE_INTEGER;
+            let lastTop = Number.MAX_SAFE_INTEGER;
+            let lastBottom = Number.MIN_SAFE_INTEGER;
+            for(let i=0; i<wi.length; i++) {
+                let idx = wi[i];
+                let wordInfoPoly = g_wordsInfo[idx].poly;
+                if(wordInfoPoly.x < lastLeft) lastLeft = wordInfoPoly.x;
+                if(wordInfoPoly.x + wordInfoPoly.w > lastRight) lastRight = wordInfoPoly.x + wordInfoPoly.w;
+                if(wordInfoPoly.y < lastTop) lastTop = wordInfoPoly.y;
+                if(wordInfoPoly.y + wordInfoPoly.h > lastBottom) lastBottom = wordInfoPoly.y + wordInfoPoly.h;
+            }
+            
+            if(wi.length < 1) {
+                lastLeft = 0;
+                lastRight = 0;
+                lastTop = 0;
+                lastBottom = 0;
+            }
+
+            console.log(`${lastLeft},${lastTop},${lastRight},${lastBottom}`);
+
+            return [lastLeft, lastTop, lastRight, lastBottom];
         }
 
         function initScreenPartitions() {
@@ -290,7 +372,7 @@
             let drawFullStats = g_config.drawFullStats;
             ctx.save();
             let words = [];
-            let wi = wordsInfoIndicesFromMousePos();
+            let wi = g_drawSelectionRectMode ? wordsInfoIndicesFromBoundingRect(g_selectionRectOrgX, g_selectionRectOrgY, g_mouseX - g_selectionRectOrgX , g_mouseY - g_selectionRectOrgY) : wordsInfoIndicesFromMousePos();
             for(let i=0; i<wi.length; i++) {
                 let idx = wi[i];
                 let wordInfoPoly = g_wordsInfo[idx].poly;
@@ -302,11 +384,29 @@
             
             let drawCursorLabels = (g_config.drawCursorLabels) && (g_mouseX > 0  && g_mouseY > 0);
             if(drawCursorLabels) {
-                if(words.length > 0) {
+                if(words.length > 0 && !g_drawSelectionRectMode) {
                     drawLabel(g_offscreenCanvas, `(${parseInt(g_mouseX)},${parseInt(g_mouseY)}) ${words.join(" ")}`, g_mouseX, g_mouseY-22, 0, 22, "#000000ff", "#000000ff", "#ffffffff");
+                } else if(g_drawSelectionRectMode) {
+                    let ttX = Math.min(g_mouseX, g_selectionRectOrgX);
+                    let ttY = Math.min(g_mouseY, g_selectionRectOrgY);
+                    const [rcLeft, rcTop, rcRight, rcBottom] = getSelectedWordsBoundingRect();
+                    drawLabel(g_offscreenCanvas, `(${(rcLeft)}, ${(rcTop)}) - (${(rcRight)}, ${(rcBottom)})`, ttX, ttY-22, 0, 22, "#000000ff", "#000000ff", "#ffffffff");
+                    ctx.lineWidth = 2;
+                    drawFrame(g_offscreenCanvas, rcLeft, rcTop, rcRight-rcLeft , rcBottom-rcTop, "#7e7e00ff", "#00000000");
+                    ctx.setLineDash([5,5]);
+                    drawFrame(g_offscreenCanvas, rcLeft, rcTop, rcRight-rcLeft , rcBottom-rcTop, "#000000ff", "#00000000");
+                    //drawLabel(g_offscreenCanvas, `(x:${parseInt(g_selectionRectOrgX)}, y:${parseInt(g_selectionRectOrgY)})(w:${Math.abs(parseInt(g_mouseX - g_selectionRectOrgX))}, h:${Math.abs(parseInt(g_mouseY - g_selectionRectOrgY))})`, ttX, ttY-22, 0, 22, "#000000ff", "#000000ff", "#ffffffff");
                 } else {
                     drawLabel(g_offscreenCanvas, `(${parseInt(g_mouseX)},${parseInt(g_mouseY)})`, g_mouseX, g_mouseY-22, 0, 22, "#000000ff", "#000000ff", "#ffffffff");
                 }
+            }
+            ctx.restore();
+
+            ctx.save();
+            if(g_drawSelectionRectMode) {
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5,5]);
+                drawFrame(g_offscreenCanvas, g_selectionRectOrgX, g_selectionRectOrgY, g_mouseX- g_selectionRectOrgX , g_mouseY - g_selectionRectOrgY, "#000000ff", "#00000000");
             }
             ctx.restore();
 
@@ -318,14 +418,16 @@
                 g_menuBuilderCanvas.getContext('2d').drawImage(g_offscreenCanvas, 0, 0);
             }
 
-            // let drawCursorLabels = true;
-            // if(drawCursorLabels && g_menuBuilderCanvas !== null) {
+            // drawCursorLabels = (g_config.drawCursorLabels && g_menuBuilderCanvas !== null) && (g_mouseX > 0  && g_mouseY > 0);
+            // if(drawCursorLabels) {
             //     if(words.length > 0) {
-            //         drawText(g_menuBuilderCanvas, words.join(" "), g_mouseX, g_mouseY-14);
+            //         drawLabel(g_menuBuilderCanvas, `(${parseInt(g_mouseX)},${parseInt(g_mouseY)}) ${words.join(" ")}`, g_mouseX, g_mouseY-22, 0, 22, "#000000ff", "#000000ff", "#ffffffff");
             //     } else {
-            //         drawText(g_menuBuilderCanvas, `(${parseInt(g_mouseX)},${parseInt(g_mouseY)})`, g_mouseX, g_mouseY-14);
+            //         drawLabel(g_menuBuilderCanvas, `(${parseInt(g_mouseX)},${parseInt(g_mouseY)})`, g_mouseX, g_mouseY-22, 0, 22, "#000000ff", "#000000ff", "#ffffffff");
             //     }
             // }
+
+            
         }
 
 
