@@ -11,6 +11,10 @@
         let g_drawSelectionRectMode = false;
         let g_selectionRectOrgX = 0;
         let g_selectionRectOrgY = 0;
+        let g_drawMarkedArea = false;
+
+        let g_originalImageWidth = 0;
+        let g_originalImageHeight = 0;
 
         const LabelFillStyle = "rgba(255, 255, 0, 0.8";
         const LabelBorderStyle = "#000000";
@@ -43,7 +47,7 @@
                     g_menuImage = new Image(); 
                     g_menuImage.src = eventData.src
                     g_menuImage.onload = () => {
-                      g_menuBuilderCanvas.width =g_menuImage.width;
+                      g_menuBuilderCanvas.width = g_menuImage.width;
                       g_menuBuilderCanvas.height = g_menuImage.height;
                         initScreenPartitions();
                         updateGraphics();
@@ -51,9 +55,11 @@
                     }                  
                 } else if(eventData.msg === 'markArea') {
                     g_markedArea = eventData.markArea;
+                    g_drawMarkedArea = true;
                     updateGraphics();
                 } else if(eventData.msg === 'clearMarkArea') {
                     g_markedArea = {x:0, y:0, w:0, h:0};
+                    g_drawMarkedArea = false;
                     updateGraphics();
                 } else if(eventData.msg === 'setAllAreas') {
                     g_areasData = eventData.areasData;     
@@ -92,17 +98,18 @@
                 if(g_areasData !== null && g_menuImage !== null) {                                   
                     let i = areaIndexFromMousePos();
                     let areadDataValid = i > -1;   
-                    let userSelectedRectValid = userMarkingSelection();                              
+                    let userSelectedRectValid = userMarkingSelection();  
+                    const [rcLeft, rcTop, rcRight, rcBottom] = getSelectedWordsBoundingRect();                       
                     let msg = {
                         msg: 'areaSelected',
                         areaDataValid: areadDataValid,
                         areaData: g_areasData[i],
                         userSelectedRectValid: userSelectedRectValid,
                         userSelectedRect: {
-                            x: userSelectedRectValid ? parseInt(g_selectionRectOrgX) : -1,
-                            y: userSelectedRectValid ? parseInt(g_selectionRectOrgY) : -1,
-                            w: userSelectedRectValid ? parseInt(g_mouseX- g_selectionRectOrgX) : -1,
-                            h: userSelectedRectValid ? parseInt(g_mouseY - g_selectionRectOrgY) : -1,
+                            x: userSelectedRectValid ? parseInt(rcLeft) : -1,
+                            y: userSelectedRectValid ? parseInt(rcTop) : -1,
+                            w: userSelectedRectValid ? parseInt(rcRight - rcLeft) : -1,
+                            h: userSelectedRectValid ? parseInt(rcBottom - rcTop) : -1,
                         }
                     }
                     //console.log(`mouseup selected id: ${msg.areaData.id}`);
@@ -366,26 +373,40 @@
             let ry = (g_menuImage !== null) ? g_menuImage.height / rc.bottom : 1;
             //console.log(`menuImageW:${(g_menuImage !== null) ? g_menuImage.width : -1} menuImageH:${(g_menuImage !== null) ? g_menuImage.height : -1} ratio: rx:${rx} ry:${ry} mouseX:${g_mouseX} mouseY:${g_mouseY}`);
 
-            ctx.save();
-            //ctx.globalCompositeOperation = 'difference';
-            drawFrame(g_offscreenCanvas, g_markedArea.x, g_markedArea.y, g_markedArea.w, g_markedArea.h, "#00ff003c","#00ff003c");
-            ctx.restore();
+            if(g_drawMarkedArea) {
+                ctx.save();
+                //ctx.globalCompositeOperation = 'difference';
+                drawFrame(g_offscreenCanvas, g_markedArea.x, g_markedArea.y, g_markedArea.w, g_markedArea.h, "#00ff003c","#00ff003c");
+                ctx.lineWidth = 2;
+                ctx.setLineDash([2,2]);
+                drawFrame(g_offscreenCanvas, g_markedArea.x, g_markedArea.y, g_markedArea.w, g_markedArea.h, "#003c00ff","#00000000");
+                ctx.restore();
+            }
 
             
             if(g_areasData !== null) {
                 ctx.save();
+                if(g_config.drawAllAreas) {
+                    for(let i=0; i<g_areasData.length; i++) {
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([2,2]);
+                        if(!(
+                            g_areasData[i].x === g_markedArea.x &&
+                            g_areasData[i].y ===g_markedArea.y &&
+                            g_areasData[i].w === g_markedArea.w &&
+                            g_areasData[i].h === g_markedArea.h
+                            )) {
+                                drawFrame(g_offscreenCanvas, g_areasData[i].x, g_areasData[i].y, g_areasData[i].w, g_areasData[i].h, "#0000ffff","#0000ff1a");
+                            }
+                    }
+                } 
+
                 let i = areaIndexFromMousePos();
                 if(i > -1) {                    
                     //ctx.globalCompositeOperation = 'difference';                        
                     drawFrame(g_offscreenCanvas, g_areasData[i].x, g_areasData[i].y, g_areasData[i].w, g_areasData[i].h, "#0000ff3c","#0000ff3c");                                       
                 }
-                if(g_config.drawAllAreas) {
-                    for(let i=0; i<g_areasData.length; i++) {
-                        ctx.lineWidth = 2;
-                        ctx.setLineDash([2,2]);
-                        drawFrame(g_offscreenCanvas, g_areasData[i].x, g_areasData[i].y, g_areasData[i].w, g_areasData[i].h, "#0000ffff","#00000000");
-                    }
-                }                 
+                
                 ctx.restore(); 
             }
 
