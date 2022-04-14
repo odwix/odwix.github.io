@@ -4,12 +4,14 @@ import {fetch} from 'wix-fetch';
 import {extractMenu, getMenuAnnotations, extractMenuFromCoords} from 'backend/main'
 import wixData from 'wix-data';
 import wixWindow from 'wix-window';
+import wixLocation from 'wix-location';
 
 let g_state = {
 	analayzing: false,
 	analayzingFailed: false,
 	analyzingFailedMsgLine: '',
 	fetchingWordsInfo: false,
+	dataDirty: false,
 }
 
 let g_selectedRowData = null;
@@ -41,29 +43,29 @@ function initTableCols(colWidth1=140, colWidth2=480, colWidth3=50) {
 	$w('#table1').columns = [
 		{
 			"id": "col0",
-			"dataPath": "section_name",
+			"dataPath": "_section_name",
 			"label": "Name",
 			"width": colWidth1,
 			"visible": true,
-			"type": "string",
+			"type": "richText",
 			"linkPath": "link-field-or-property"
 		},
 		{
 			"id": "col1",
-			"dataPath": "item_description",
+			"dataPath": "_item_description",
 			"label": "Description",
 			"width": colWidth2,
 			"visible": true,
-			"type": "string",
+			"type": "richText",
 			"linkPath": "link-field-or-property"
 		},
 		{
 			"id": "col2",
-			"dataPath": "price",
+			"dataPath": "_price",
 			"label": "Price",
 			"width": colWidth3,
 			"visible": true,
-			"type": "string",
+			"type": "richText",
 			"linkPath": "link-field-or-property"
 		}
 	];
@@ -270,8 +272,11 @@ function rowsFromMenuData(data) {
 
 			let item = {
 				id: `id_${row_id}`,
+				_section_name: name,
 				section_name: name,
+				_item_description: description,
 				item_description: description,
+				_price: price,
 				price: price,
 				x, y, w, h,
 				nx: parseInt(x/50)*50,
@@ -302,14 +307,22 @@ function sortRowsByMenuStructure(rows) {
 		})
 }
 
-/**
-*	Adds an event handler that runs when the element is clicked.
-	[Read more](https://www.wix.com/corvid/reference/$w.ClickableMixin.html#onClick)
-*	 @param {MouseEvent} event
-*/
-export function button1_click(event) {
-	// This function was added from the Properties & Events panel. To learn more, visit http://wix.to/UcBnC-4
-	// Add your code for this event here: 
+function doModal_YesNoDialog(title, message) {
+	let context = {
+		title,
+		text: message,
+	};
+	return wixWindow.openLightbox('yes_no_dialog', context);
+}
+
+function showDirtyWarningDialog() {
+	let title = '<p style="border:1px solid black; color:black; background:red; font-weight:bold">Warning!</p>';
+	let msg = '<div style="padding:5px; font-size: 16px;">The changes that you have made to the menu will be lost<br/>if you continue!</div><div style="padding:5px; font-size:16px;">Continue anyway?</div>';
+	return doModal_YesNoDialog(title, msg)
+}
+
+function doExtractMenu() {
+	g_state.dataDirty = false;
 
 	resetAllControls();	
 
@@ -396,7 +409,27 @@ export function button1_click(event) {
 		$w('#input1').enable();
 		updateAllControls();
 		
-	})	
+	})
+}
+
+/**
+*	Adds an event handler that runs when the element is clicked.
+	[Read more](https://www.wix.com/corvid/reference/$w.ClickableMixin.html#onClick)
+*	 @param {MouseEvent} event
+*/
+export function button1_click(event) {
+	// This function was added from the Properties & Events panel. To learn more, visit http://wix.to/UcBnC-4
+	// Add your code for this event here: 
+	if(g_state.dataDirty) {
+		showDirtyWarningDialog()
+		.then(res => {
+			if(res.result) {
+				doExtractMenu();
+			}
+		});
+	} else {
+		doExtractMenu();
+	}	
 }
 
 function deleteRowFromTable(id, row) {
@@ -430,6 +463,7 @@ function updateMenuItemFromUserSelectedRect(id, extracted) {
 	let item = rowsFromMenuData(extracted)[0];
 	console.log(JSON.stringify(item));
 	let context = {
+		title: 'Update Dish (from marked region)',
 		showDeleteButton: false,
 		data: {
 			section_name:item.section_name,
@@ -441,11 +475,15 @@ function updateMenuItemFromUserSelectedRect(id, extracted) {
 	wixWindow.openLightbox("dish_editor", context)
 	.then( res => {
 		if(res !== null) {
+			g_state.dataDirty = true;
 			let rows = $w('#table1').rows;
 			for(let i=0; i<rows.length; i++) {
 				if(rows[i].id === id) {
+					rows[i]._section_name = `<span style="color:Blue;">${res.section_name}</span>`;					
+					rows[i]._item_description = `<span style="color:Blue;">${res.item_description}</span>`;
+					rows[i]._price = `<span style="color:Blue;">${res.price}</span>`;
 					rows[i].section_name = res.section_name;
-					rows[i].item_description = res.item_description;
+					rows[i].item_description = res.item_description;					
 					rows[i].price = res.price;
 					rows[i].x = item.x;
 					rows[i].y = item.y;
@@ -476,7 +514,8 @@ function addNewMenuItemByUserSelectionRect(extracted) {
 	console.log(JSON.stringify(item));
 	let context = {
 		showDeleteButton: false,
-		data: {
+		title: 'Add New Dish',
+		data: {			
 			section_name:item.section_name,
 			item_description: item.item_description,
 			price: item.price,
@@ -486,12 +525,16 @@ function addNewMenuItemByUserSelectionRect(extracted) {
 	wixWindow.openLightbox("dish_editor", context)
 	.then( res => {
 		if(res !== null) {
+			g_state.dataDirty = true;
 			let rows = $w('#table1').rows;
 			let newRow = {
-				id: `id_${rows.length+1}`,
-				section_name : res.section_name,
-				item_description : res.item_description,
-				price : res.price,
+				id: `id_${rows.length+1}`,				
+				_section_name: `<span style="color:DarkGreen;">${res.section_name}</span>`,				
+				_item_description: `<span style="color:DarkGreen;">${res.item_description}</span>`,
+				_price: `<span style="color:DarkGreen;">${res.price}</span>`,
+				section_name: res.section_name,
+				item_description: res.item_description,
+				price: res.price,
 				x: item.x,
 				y: item.y,
 				w: item.w,
@@ -656,6 +699,11 @@ export function html1_message(event) {
 						updateAllControls();
 					});
 			}
+		} else if(data.msg === 'areaSelected-dblclick') {
+			let areaData = data.areaData;
+				console.log(areaData.id);
+				selectTableRowById(areaData.id);
+				updateSelectedRow();
 		} else if(data.msg === 'imageUnloaded') {			
 				$w('#button1').disable();
 				$w('#button2').link = '';
@@ -667,6 +715,40 @@ export function html1_message(event) {
 				$w('#button2').enable();
 			}
 		}
+	}
+}
+
+function updateSelectedRow() {
+	let rows = $w('#table1').rows;
+	if(g_selectedRowData !== null) {
+		let data = {
+			title: 'Edit Selected Dish',
+			showDeleteButton: true,
+			data: g_selectedRowData,
+		}	
+		wixWindow.openLightbox("dish_editor", data)
+		.then(res => {
+			if(res !== null) {				
+				g_state.dataDirty = true;				
+				if(res.section_name === null && res.item_description === null && res.price === null) {													
+					deleteRowFromTable(g_selectedRowData.id, res);
+				} else {
+					for(let i=0; i<rows.length; i++) {
+						if(rows[i].id === g_selectedRowData.id) {
+							rows[i].section_name = res.section_name;
+							rows[i].item_description = res.item_description;
+							rows[i].price = res.price;
+							rows[i]._section_name = `<span style="color:DarkOrange">${res.section_name}</span>`;
+							rows[i]._item_description = `<span style="color:DarkOrange">${res.item_description}</span>`;
+							rows[i]._price = `<span style="color:DarkOrange">${res.price}</span>`;
+							$w('#table1').rows = rows;
+							$w('#table1').selectRow(i);
+							break;
+						}
+					}
+					}
+			}
+		})	
 	}
 }
 
@@ -682,32 +764,7 @@ export function table1_dblClick(event) {
 	g_state.analayzingFailed = false;
 	updateAllControls();
 
-	let rows = event.target.rows;
-	if(g_selectedRowData !== null) {
-		let data = {
-			showDeleteButton: true,
-			data: g_selectedRowData,
-		}	
-		wixWindow.openLightbox("dish_editor", data)
-		.then(res => {
-			if(res !== null) {								
-				if(res.section_name === null && res.item_description === null && res.price === null) {									
-					deleteRowFromTable(g_selectedRowData.id, res);
-				} else {
-					for(let i=0; i<rows.length; i++) {
-						if(rows[i].id === g_selectedRowData.id) {
-							rows[i].section_name = res.section_name;
-							rows[i].item_description = res.item_description;
-							rows[i].price = res.price;
-							$w('#table1').rows = rows;
-							$w('#table1').selectRow(i);
-							break;
-						}
-					}
-					}
-			}
-		})	
-	}
+	updateSelectedRow();	
 }
 
 /**
@@ -770,7 +827,31 @@ export function button4_click(event) {
 	// This function was added from the Properties & Events panel. To learn more, visit http://wix.to/UcBnC-4
 	// Add your code for this event here:
 	g_state.analayzing = false; 
-	g_state.analayzingFailed = true;
-	g_state.analyzingFailedMsgLine = 'Not implemented yet...';
+	g_state.analayzingFailed = false;
+	//g_state.analyzingFailedMsgLine = 'Not implemented yet...';
 	updateAllControls();
+	let rows = $w('#table1').rows;
+	let exportRows = {
+		msid: wixLocation.query["id"],
+		items: rows.map((v,i) => {
+		return {
+			name: v.section_name,
+			description: v.item_description,
+			price: v.price,
+			x: v.x,
+			y: v.y,
+			w: v.w,
+			h: v.h,
+		}
+	})
+	}
+
+	let context = {
+		title: 'Export Menu',
+		data: JSON.stringify(exportRows, null, 2),
+	}
+	wixWindow.openLightbox('exporter', context)
+	.then(res => {
+
+	});
 }
