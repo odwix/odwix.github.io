@@ -47,8 +47,12 @@
                     g_menuImage = new Image(); 
                     g_menuImage.src = eventData.src
                     g_menuImage.onload = () => {
-                      g_menuBuilderCanvas.width = g_menuImage.width;
-                      g_menuBuilderCanvas.height = g_menuImage.height;
+                        g_menuBuilderCanvas.width = g_menuImage.width;
+                        g_menuBuilderCanvas.height = g_menuImage.height;
+                        if(g_menuImage.height > 1800) {    
+                            let prop = g_menuImage.width /  document.getElementById('main').getBoundingClientRect().width;                   
+                            g_menuBuilderCanvas.style.height = `${g_menuImage.height/prop}px`;
+                        }
                         initScreenPartitions();
                         updateGraphics();
                         window.parent.postMessage({msg:'imageLoaded'}, '*');
@@ -83,10 +87,10 @@
                     let rc = g_menuBuilderCanvas.getBoundingClientRect();
                     
                     let rx = g_menuImage.width / rc.right;
-                    let ry = g_menuImage.height / rc.bottom;
+                    let ry = g_menuImage.height / rc.height;
                     g_mouseX = (event.clientX - rc.left) * rx;
                     g_mouseY = (event.clientY - rc.top) * ry;  
-                    //console.log(`mouseX:${g_mouseX} mouseY:${g_mouseY}`);
+                    //console.log(`ry:${ry} rcTop:${rc.top} mouseY:${g_mouseY} scrollTop:${document.getElementById('main').scrollTop} height:${g_menuBuilderCanvas.style.height}`)
                     
                     let parIdx = partitionIndexFromMousePos();
                     //console.log(`screen partition id:${parIdx}`);              
@@ -481,8 +485,9 @@
 
     </script>
 
-    
-    <canvas id="menuBuilder"style="position:fixed; left:0; top: 0; width:100%; height:100%; transform: scale(1, 1); transform-origin: top left;"></canvas>
+    <div id="main" style="overflow:auto; position:fixed; left:0; top: 0; width:100%; height:100%; transform: scale(1, 1); transform-origin: top left;">
+        <canvas id="menuBuilder"style="position:fixed; left:0; top: 0; width:100%; height:100%; transform: scale(1, 1); transform-origin: top left;"></canvas>
+    </div>
    
     
     </body>
