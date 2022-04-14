@@ -10,6 +10,8 @@ $w.onReady(function () {
 
 	// Click 'Preview' to run your code
 	let context = wixWindow.lightbox.getContext();
+	let title = (context.title !== undefined && context.title.length > 0) ? context.title : "Dish Editor";
+	$w('#text1').text = title;
 	$w("#input1").value = context.data.section_name;
 	$w("#input2").value = context.data.item_description;
 	$w("#input3").value = context.data.price;
