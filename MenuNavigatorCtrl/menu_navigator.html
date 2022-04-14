@@ -98,14 +98,14 @@
                 }
             });
 
-            g_menuBuilderCanvas.onmouseup = ((event) => {
+            function notifySelectedArea(command, event) {
                 if(g_areasData !== null && g_menuImage !== null) {                                   
                     let i = areaIndexFromMousePos();
                     let areadDataValid = i > -1;   
                     let userSelectedRectValid = userMarkingSelection();  
                     const [rcLeft, rcTop, rcRight, rcBottom] = getSelectedWordsBoundingRect();                       
                     let msg = {
-                        msg: 'areaSelected',
+                        msg: command,
                         areaDataValid: areadDataValid,
                         areaData: g_areasData[i],
                         userSelectedRectValid: userSelectedRectValid,
@@ -119,6 +119,15 @@
                     //console.log(`mouseup selected id: ${msg.areaData.id}`);
                     window.parent.postMessage(msg, "*");                    
                 }
+            }
+
+            g_menuBuilderCanvas.onmouseup = ((event) => {
+                notifySelectedArea('areaSelected', event);
+            });
+
+            g_menuBuilderCanvas.ondblclick = ((event) => {
+                notifySelectedArea('areaSelected-dblclick', event);
+                console.log('areaSelected-dblclick');
             });
 
             g_menuBuilderCanvas.onpointerdown = (e) => {
