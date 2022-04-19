@@ -27,6 +27,14 @@
         
         let g_zoom = 0;
         let g_zoomLimit = 500;
+
+        let g_autoScrollData = {
+            mouseDownClientX: 0,
+            mouseDownClientY: 0,
+            currentClientX: 0,
+            currentClientY: 0,
+            mouseDownPressed: false,
+        };
         
         let g_config = {
             drawFullStats: false,
@@ -166,7 +174,19 @@
                 g_drawSelectionRectMode = true;
                 g_selectionRectOrgX = g_mouseX;
                 g_selectionRectOrgY = g_mouseY;
+
+                if(!g_autoScrollData.mouseDownPressed) {
+                    g_autoScrollData.mouseDownPressed = true;
+                    g_autoScrollData.currentClientX = e.clientX;
+                    g_autoScrollData.currentClientY = e.clientY;
+                    g_autoScrollData.mouseDownClientX = e.clientX;
+                    g_autoScrollData.mouseDownClientY = e.clientY;
+                }
+                
                 g_menuBuilderCanvas.onpointermove = (e) => {
+                    g_autoScrollData.currentClientX = e.clientX;
+                    g_autoScrollData.currentClientY = e.clientY;
+                    console.log(`pointermove: cX${e.clientX} cY${e.clientY}`);
                     updateGraphics(); 
                 };
                 g_menuBuilderCanvas.setPointerCapture(e.pointerId);
@@ -174,16 +194,46 @@
             }
 
             g_menuBuilderCanvas.onpointerup = (e) => {
+                g_autoScrollData.currentClientX = 0;
+                g_autoScrollData.currentClientY = 0;
+                g_autoScrollData.mouseDownClientX = 0;
+                g_autoScrollData.mouseDownClientY = 0;
+                g_autoScrollData.mouseDownPressed = false;
+
                 g_drawSelectionRectMode = false;
                 g_menuBuilderCanvas.onpointermove = null;
                 g_menuBuilderCanvas.releasePointerCapture(e.pointerId);
+
                 updateGraphics();
             }
 
-            // g_menuBuilderCanvas.width = 1500;
+
 
             g_offscreenCanvas = document.createElement('canvas');
             g_offscreenCanvas.getContext('2d').translate(-.5, -.5);
+
+
+            window.setInterval(() => {
+                let rcMain = document.getElementById('main').getBoundingClientRect();
+                //Check autoscroll data:
+                if(g_autoScrollData.mouseDownPressed) {
+                    if(g_autoScrollData.currentClientX > g_autoScrollData.mouseDownClientX + 5 && g_autoScrollData.currentClientX > rcMain.width - 50) {
+                        //scroll the client to the left
+                        document.getElementById('main').scrollLeft += 10;
+                    } else if(g_autoScrollData.currentClientX < g_autoScrollData.mouseDownClientX - 5 && g_autoScrollData.currentClientX < 50) {
+                        //scroll the client to the right
+                        document.getElementById('main').scrollLeft -= 10;
+                    }
+
+                    if(g_autoScrollData.currentClientY > g_autoScrollData.mouseDownClientY + 5 && g_autoScrollData.currentClientY > rcMain.height - 50) {
+                        //scroll the client to the top
+                        document.getElementById('main').scrollTop += 10;
+                    } else if(g_autoScrollData.currentClientY < g_autoScrollData.mouseDownClientY - 5 && g_autoScrollData.currentClientY < 50) {
+                        //scroll the client to the bottom
+                        document.getElementById('main').scrollTop -= 10;
+                    }
+                }
+            }, 100);
            
             updateGraphics();
         }
