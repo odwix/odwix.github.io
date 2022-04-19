@@ -24,7 +24,10 @@
         let g_wordsInfo = [];
 
         let g_screenPartitions = []; //array of rectangles
-
+        
+        let g_zoom = 0;
+        let g_zoomLimit = 500;
+        
         let g_config = {
             drawFullStats: false,
             drawCursorLabels: false,
@@ -34,12 +37,14 @@
         }
 
         window.onmessage = (event) => {
+            console.log(JSON.stringify(event))
                 let eventData = event.data;
                 if(eventData.msg === 'setConfig') {
                     g_config = eventData.config;
                     updateGraphics();
                 } else if(eventData.msg === 'setImage') {   
                     g_menuImage = null;
+                    g_zoom = 0;
                     updateGraphics();   
 
                     window.parent.postMessage({msg:'imageUnloaded'}, '*');  
@@ -47,12 +52,15 @@
                     g_menuImage = new Image(); 
                     g_menuImage.src = eventData.src
                     g_menuImage.onload = () => {
+                        g_zoom = 0;
+                        
                         g_menuBuilderCanvas.width = g_menuImage.width;
                         g_menuBuilderCanvas.height = g_menuImage.height;
-                        if(g_menuImage.height > 1800) {    
-                            let prop = g_menuImage.width /  document.getElementById('main').getBoundingClientRect().width;                   
-                            g_menuBuilderCanvas.style.height = `${g_menuImage.height/prop}px`;
-                        }
+                            
+                        let prop = g_menuImage.width /  document.getElementById('main').getBoundingClientRect().width;
+                        g_menuBuilderCanvas.style.width =   `${g_menuImage.width/prop}px`;                 
+                        g_menuBuilderCanvas.style.height = `${g_menuImage.height/prop}px`;
+                        
                         initScreenPartitions();
                         updateGraphics();
                         window.parent.postMessage({msg:'imageLoaded'}, '*');
@@ -77,6 +85,29 @@
                     //console.log(JSON.stringify(g_wordsInfo));
                   
                     updateGraphics();
+                } else if(eventData.msg === 'zoomIn') {                    
+                    if(g_zoom < g_zoomLimit) {
+                        //console.log(`zoom: ${g_zoom}, w:${g_menuBuilderCanvas.style.width}, h:${g_menuBuilderCanvas.style.height}`);
+                        g_zoom += 10; //percent
+                        
+                        let bounds = document.getElementById('main').getBoundingClientRect();
+
+                        prop = g_menuImage.width /  document.getElementById('main').getBoundingClientRect().width; 
+
+                        g_menuBuilderCanvas.style.width = `${bounds.width * (100 + g_zoom) / 100}px`;
+                        g_menuBuilderCanvas.style.height = `${g_menuImage.height/prop * (100 + g_zoom) / 100}px`;
+                        updateGraphics();
+                    }
+                } else if(eventData.msg === 'zoomOut') {                    
+                    if(g_zoom > 0) {
+                        //console.log(`zoom: ${g_zoom}, w:${g_menuBuilderCanvas.style.width}, h:${g_menuBuilderCanvas.style.height}`);
+                        g_zoom -= 10; //percent
+                        let bounds = document.getElementById('main').getBoundingClientRect();
+                        prop = g_menuImage.width /  document.getElementById('main').getBoundingClientRect().width; 
+                        g_menuBuilderCanvas.style.width = `${bounds.width * (100 + g_zoom) / 100}px`;
+                        g_menuBuilderCanvas.style.height = `${g_menuImage.height / prop * (100 + g_zoom) / 100 }px`;                    
+                        updateGraphics();
+                    }
                 }
         }
 
@@ -86,11 +117,12 @@
                     if(g_areasData !== null && g_menuImage !== null) {
                     let rc = g_menuBuilderCanvas.getBoundingClientRect();
                     
-                    let rx = g_menuImage.width / rc.right;
+                    let rx = g_menuImage.width / rc.width;
                     let ry = g_menuImage.height / rc.height;
                     g_mouseX = (event.clientX - rc.left) * rx;
                     g_mouseY = (event.clientY - rc.top) * ry;  
-                    //console.log(`ry:${ry} rcTop:${rc.top} mouseY:${g_mouseY} scrollTop:${document.getElementById('main').scrollTop} height:${g_menuBuilderCanvas.style.height}`)
+                    // console.log(`rx:${rx} rcLeft:${rc.left} mouseX:${g_mouseX} scrollLeft:${document.getElementById('main').scrollLeft} width:${g_menuBuilderCanvas.style.width}`)
+                    // console.log(`ry:${ry} rcTop:${rc.top} mouseY:${g_mouseY} scrollTop:${document.getElementById('main').scrollTop} height:${g_menuBuilderCanvas.style.height}`)
                     
                     let parIdx = partitionIndexFromMousePos();
                     //console.log(`screen partition id:${parIdx}`);              
