@@ -29,6 +29,11 @@ $w.onReady(function () {
 		} else {
 			g_state.msid = wixLocation.query["id"];
 		}
+		if(wixLocation.query["url"] !== undefined && wixLocation.query["url"] !== '') {
+			$w('#input1').value = wixLocation.query["url"];
+		} else {
+			g_state.msid = wixLocation.query["id"];
+		}
 	} else {
 		console.log('**** DEBUG MODE ON!!! ****');
 	}
@@ -1015,4 +1020,32 @@ export function button4_click(event) {
 			console.log(`exportMenu error: ${err}`);
 		});
 	});
+}
+
+/**
+*	Adds an event handler that runs when the element is clicked.
+	[Read more](https://www.wix.com/corvid/reference/$w.ClickableMixin.html#onClick)
+*	 @param {$w.MouseEvent} event
+*/
+export function button5_click(event) {
+	// This function was added from the Properties & Events panel. To learn more, visit http://wix.to/UcBnC-4
+	// Add your code for this event here: 
+	let msg = {
+		msg: 'zoomIn',
+	};	
+	$w('#html1').postMessage(msg);
+}
+
+/**
+*	Adds an event handler that runs when the element is clicked.
+	[Read more](https://www.wix.com/corvid/reference/$w.ClickableMixin.html#onClick)
+*	 @param {$w.MouseEvent} event
+*/
+export function button6_click(event) {
+	// This function was added from the Properties & Events panel. To learn more, visit http://wix.to/UcBnC-4
+	// Add your code for this event here: 
+	let msg = {
+		msg: 'zoomOut',
+	};	
+	$w('#html1').postMessage(msg);
 }
