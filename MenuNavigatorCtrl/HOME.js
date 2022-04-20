@@ -293,6 +293,7 @@ function tryBuildMenuAnnotations(imageUrl) {
 
 	getMenuAnnotations(imageUrl)
 	.then(res => {
+		console.log(`menuAnnotations:\n${res}`);
 		let wordsInfo = res.map((rv, ri) => {
 			return rv.paragraphs.map((pv, pi) => {
 				return pv.words.map((wv, wi) => {
@@ -323,17 +324,18 @@ function rowsFromMenuData(data) {
 			let name = '';
 			let description = '';
 			let price = '';
-			let x = 0;
-			let y = 0;
-			let w = 0;
-			let h = 0;
-			let nx = 0;
-			let ny = 0;
+			let x = v.poly !== undefined ? v.poly.x : -1;
+			let y = v.poly !== undefined ? v.poly.y : -1;
+			let w = v.poly !== undefined ? v.poly.w : -1;
+			let h = v.poly !== undefined ? v.poly.h : -1;
+			let nx = parseInt(x/50)*50;
+			let ny = parseInt(y/50)*50;
+
 			v.texts.map((gv, gi) => {
-				x = gv.pos.x;
-				y = gv.pos.y;
-				w = gv.pos.w;
-				h = gv.pos.h;
+				x = x === -1 ? gv.pos.x : x;
+				y = y === -1 ? gv.pos.y : y;
+				w = w === -1 ? gv.pos.w : w;
+				h = h === -1 ? gv.pos.h : h;
 				let text = gv.text;
 				let type = gv.type;			
 				if( type === 'item_name' || type === 'section_name' ) {
@@ -353,14 +355,12 @@ function rowsFromMenuData(data) {
 				item_description: description,
 				_price: price,
 				price: price,
-				x, y, w, h,
-				nx: parseInt(x/50)*50,
-				ny:	parseInt(y/50)*50,
+				x, y, w, h, nx, ny
+				// nx: parseInt(x/50)*50,
+				// ny:	parseInt(y/50)*50,
 			}
 
 			rows.push(item);
-			
-			
 		});
 		return rows;
 }
@@ -434,7 +434,7 @@ function doExtractMenu() {
 
 	extractMenu(imageUrl)
 	.then(data => {
-		// console.log(data);
+		console.log(data);
 
 		clearMenuNavigatorAreasData();
 
@@ -475,10 +475,12 @@ function doExtractMenu() {
 		
 	})
 	.catch(error => {
-		console.log(JSON.stringify(error));
+		//console.log(JSON.stringify(error));
 		g_state.analayzing = false;
 		g_state.analayzingFailed = true;
-		g_state.analyzingFailedMsgLine = JSON.stringify(error);
+		let msgLengthLimit = 100;
+		g_state.analyzingFailedMsgLine = error.res !== undefined ? error.res : JSON.stringify(error);
+		g_state.analyzingFailedMsgLine = getTruncatedText(g_state.analyzingFailedMsgLine, msgLengthLimit, '...');
 		
 		updateAllControls();
 	})
@@ -492,6 +494,10 @@ function doExtractMenu() {
 		updateAllControls();
 		
 	})
+}
+
+function getTruncatedText(text, limit, termination) {
+	return text.length < limit ? text : text.substring(0, limit).concat(termination);
 }
 
 /**
@@ -754,7 +760,7 @@ export function table1_cellSelect_1(event) {
 	// Add your code for this event here: 
 	try {
 		let cellData = event.cellData;
-		wixWindow.copyToClipboard(cellData);
+		//wixWindow.copyToClipboard(cellData);
 
 		if(event.target !== null && event.target.rows !== null) {
 			let rowData = event.target.rows[event.cellRowIndex];
@@ -778,7 +784,7 @@ export function table1_rowSelect(event) {
 	g_selectedRowData = event.rowData;
 	console.log(JSON.stringify(rowData));
 	setMenuMarkedArea(rowData.x, rowData.y, rowData.w, rowData.h);
-	wixWindow.copyToClipboard(`${rowData.section_name} - ${rowData.item_description} - ${rowData.price}`);
+	//wixWindow.copyToClipboard(`${rowData.section_name} - ${rowData.item_description} - ${rowData.price}`);
 }
 
 /**
@@ -990,19 +996,17 @@ export function button4_click(event) {
 	//g_state.analyzingFailedMsgLine = 'Not implemented yet...';
 	updateAllControls();
 	let rows = $w('#table1').rows;
-	let exportRows = {
-		items: rows.map((v,i) => {
+	let exportRows = rows.map((v,i) => {
 		return {
-			name: v.section_name,
-			description: v.item_description,
+			item_name: v.section_name,
+			item_description: v.item_description,
 			price: v.price,
 			// x: v.x,
 			// y: v.y,
 			// w: v.w,
 			// h: v.h,
 		}
-	})
-	}	
+	});	
 
 	let context = {
 		title: 'Export Menu',
@@ -1014,10 +1018,10 @@ export function button4_click(event) {
 		//TODO: call the imprt endpoint with params id=g_state.msid&url=g_state.lastValidImgUrl
 		exportMenu(g_state.msid, g_state.lastValidImgUrl, exportRows)
 		.then(res => {
-			console.log(`exportMenu result: ${res}`);
+			console.log(`exportMenu result: ${JSON.stringify(res)}`);
 		})
 		.catch(err => {
-			console.log(`exportMenu error: ${err}`);
+			console.log(`exportMenu error: ${JSON.stringify(err)}`);
 		});
 	});
 }
