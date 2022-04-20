@@ -181,14 +181,16 @@
                     g_autoScrollData.currentClientY = e.clientY;
                     g_autoScrollData.mouseDownClientX = e.clientX;
                     g_autoScrollData.mouseDownClientY = e.clientY;
+                    checkAutoScrolling();
                 }
                 
                 g_menuBuilderCanvas.onpointermove = (e) => {
                     g_autoScrollData.currentClientX = e.clientX;
                     g_autoScrollData.currentClientY = e.clientY;
-                    console.log(`pointermove: cX${e.clientX} cY${e.clientY}`);
+                    //console.log(`pointermove: cX${e.clientX} cY${e.clientY}`);                                        
                     updateGraphics(); 
                 };
+
                 g_menuBuilderCanvas.setPointerCapture(e.pointerId);
                 updateGraphics();
             }
@@ -202,8 +204,7 @@
 
                 g_drawSelectionRectMode = false;
                 g_menuBuilderCanvas.onpointermove = null;
-                g_menuBuilderCanvas.releasePointerCapture(e.pointerId);
-
+                g_menuBuilderCanvas.releasePointerCapture(e.pointerId);                
                 updateGraphics();
             }
 
@@ -211,31 +212,35 @@
 
             g_offscreenCanvas = document.createElement('canvas');
             g_offscreenCanvas.getContext('2d').translate(-.5, -.5);
-
-
-            window.setInterval(() => {
-                let rcMain = document.getElementById('main').getBoundingClientRect();
-                //Check autoscroll data:
-                if(g_autoScrollData.mouseDownPressed) {
-                    if(g_autoScrollData.currentClientX > g_autoScrollData.mouseDownClientX + 5 && g_autoScrollData.currentClientX > rcMain.width - 50) {
-                        //scroll the client to the left
-                        document.getElementById('main').scrollLeft += 10;
-                    } else if(g_autoScrollData.currentClientX < g_autoScrollData.mouseDownClientX - 5 && g_autoScrollData.currentClientX < 50) {
-                        //scroll the client to the right
-                        document.getElementById('main').scrollLeft -= 10;
-                    }
-
-                    if(g_autoScrollData.currentClientY > g_autoScrollData.mouseDownClientY + 5 && g_autoScrollData.currentClientY > rcMain.height - 50) {
-                        //scroll the client to the top
-                        document.getElementById('main').scrollTop += 10;
-                    } else if(g_autoScrollData.currentClientY < g_autoScrollData.mouseDownClientY - 5 && g_autoScrollData.currentClientY < 50) {
-                        //scroll the client to the bottom
-                        document.getElementById('main').scrollTop -= 10;
-                    }
-                }
-            }, 100);
            
             updateGraphics();
+        }
+
+        function checkAutoScrolling() {                       
+            if(g_autoScrollData.mouseDownPressed) {                
+                let rcMain = document.getElementById('main').getBoundingClientRect();
+                if(g_autoScrollData.currentClientX > g_autoScrollData.mouseDownClientX + 5 && g_autoScrollData.currentClientX > rcMain.width - 50) {
+                    //scroll the client to the left
+                    document.getElementById('main').scrollLeft += 5;                                        
+                } else if(g_autoScrollData.currentClientX < g_autoScrollData.mouseDownClientX - 5 && g_autoScrollData.currentClientX < 50) {
+                    //scroll the client to the right
+                    document.getElementById('main').scrollLeft -= 5;                                     
+                }
+
+                if(g_autoScrollData.currentClientY > g_autoScrollData.mouseDownClientY + 5 && g_autoScrollData.currentClientY > rcMain.height - 50) {
+                    //scroll the client to the top
+                    document.getElementById('main').scrollTop += 5;                                      
+                } else if(g_autoScrollData.currentClientY < g_autoScrollData.mouseDownClientY - 5 && g_autoScrollData.currentClientY < 50) {
+                    //scroll the client to the bottom
+                    document.getElementById('main').scrollTop -= 5;                                        
+                }
+                updateGraphics();                    
+                
+                window.setTimeout(() => {
+                    checkAutoScrolling();
+                },10);         
+                       
+            }            
         }
 
         function userMarkingSelection() {
