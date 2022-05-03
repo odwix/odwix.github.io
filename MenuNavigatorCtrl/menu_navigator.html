@@ -76,6 +76,7 @@
                 } else if(eventData.msg === 'markArea') {
                     g_markedArea = eventData.markArea;
                     g_drawMarkedArea = true;
+                    maybeScrollToMarkedArea();                    
                     updateGraphics();
                 } else if(eventData.msg === 'clearMarkArea') {
                     g_markedArea = {x:0, y:0, w:0, h:0};
@@ -138,12 +139,13 @@
                 }
             });
 
+        
             function notifySelectedArea(command, event) {
                 if(g_areasData !== null && g_menuImage !== null) {                                   
                     let i = areaIndexFromMousePos();
-                    let areadDataValid = i > -1;   
-                    let userSelectedRectValid = userMarkingSelection();  
-                    const [rcLeft, rcTop, rcRight, rcBottom] = getSelectedWordsBoundingRect();                       
+                    let areadDataValid = i > -1;    
+                    const [rcLeft, rcTop, rcRight, rcBottom] = getSelectedWordsBoundingRect();  
+                    let userSelectedRectValid = userMarkingSelection() && (rcLeft !== 0 && rcTop !== 0 && rcRight !== 0 && rcBottom !== 0);                
                     let msg = {
                         msg: command,
                         areaDataValid: areadDataValid,
@@ -157,7 +159,9 @@
                         }
                     }
                     //console.log(`mouseup selected id: ${msg.areaData.id}`);
-                    window.parent.postMessage(msg, "*");                    
+                    
+                    window.parent.postMessage(msg, "*");      
+                    
                 }
             }
 
@@ -187,7 +191,8 @@
                 g_menuBuilderCanvas.onpointermove = (e) => {
                     g_autoScrollData.currentClientX = e.clientX;
                     g_autoScrollData.currentClientY = e.clientY;
-                    //console.log(`pointermove: cX${e.clientX} cY${e.clientY}`);                                        
+                    //console.log(`pointermove: cX${e.clientX} cY${e.clientY}`);                  
+                                                       
                     updateGraphics(); 
                 };
 
@@ -241,6 +246,36 @@
                 },10);         
                        
             }            
+        }
+
+        function maybeScrollToMarkedArea() {  
+            return;          
+            // if(g_zoom > 0) {
+                let mainElement = document.getElementById('main');
+                let bounds = mainElement.getBoundingClientRect();
+                
+                let width = bounds.width;
+                let height = bounds.height;
+                let scrollLeft = mainElement.scrollLeft;
+                let scrollTop = mainElement.scrollTop;
+
+                let zoom = (100 + g_zoom) / 100;
+                let propX = g_menuImage.width /  width;
+                let propY = g_menuImage.height / height;      
+
+                let rX = g_markedArea.x * zoom;
+                console.log(`rX:${rX} SL:${scrollLeft} ST:${scrollTop}`);
+                if(g_markedArea.x * zoom - mainElement.scrollLeft < g_markedArea.x * zoom || g_markedArea.x * zoom > width * zoom)             
+                    mainElement.scrollLeft =  g_markedArea.x;
+
+                
+                if((g_markedArea.y * zoom)/propX  - mainElement.scrollTop < g_markedArea.y * zoom/propX || (g_markedArea.y * zoom)/propX  > height * zoom )
+                    mainElement.scrollTop = (g_markedArea.y)/propX;
+                
+                
+            // }
+                
+                console.log(`width:${width} height:${height}\n maX:${g_markedArea.x} maY:${g_markedArea.y}\n zoom:${zoom}\n propX:${propX}\n propY:${propY}\n SL:${mainElement.scrollLeft} ST:${mainElement.scrollTop}`);
         }
 
         function userMarkingSelection() {
