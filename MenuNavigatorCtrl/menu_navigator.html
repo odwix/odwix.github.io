@@ -168,15 +168,15 @@
                 }
             }
 
-            g_elementMain.onscroll = (e) => {
-                let scrollLeft = g_elementMain.scrollLeft;
-                let scrollTop = g_elementMain.scrollTop;
-                let bounds = g_elementMain.getBoundingClientRect();
-                let scaledImageWidth = parseInt(g_menuBuilderCanvas.style.width);;
-                let scaledImageHeight = parseInt(g_menuBuilderCanvas.style.height);
-                let prop = scaledImageWidth / g_menuBuilderCanvas.width;
-                console.log(`\n---------\menuStyleWidth:${scaledImageWidth} menuStyleHeight:${scaledImageHeight} prop:${prop} nonscroll:\nscrollLeft:${scrollLeft} scrollTop:${scrollTop}\n----------\n`);
-            }
+            // g_elementMain.onscroll = (e) => {
+            //     let scrollLeft = g_elementMain.scrollLeft;
+            //     let scrollTop = g_elementMain.scrollTop;
+            //     let bounds = g_elementMain.getBoundingClientRect();
+            //     let scaledImageWidth = parseInt(g_menuBuilderCanvas.style.width);;
+            //     let scaledImageHeight = parseInt(g_menuBuilderCanvas.style.height);
+            //     let prop = scaledImageWidth / g_menuBuilderCanvas.width;
+            //     console.log(`\n---------\menuStyleWidth:${scaledImageWidth} menuStyleHeight:${scaledImageHeight} prop:${prop} nonscroll:\nscrollLeft:${scrollLeft} scrollTop:${scrollTop}\n----------\n`);
+            // }
 
             g_menuBuilderCanvas.onmouseup = ((event) => {
                 notifySelectedArea('areaSelected', event);
