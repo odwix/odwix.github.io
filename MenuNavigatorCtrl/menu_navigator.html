@@ -44,6 +44,8 @@
             drawAllAreas: false,
         }
 
+        let g_elementMain = null;
+
         window.onmessage = (event) => {
             console.log(JSON.stringify(event))
                 let eventData = event.data;
@@ -121,6 +123,7 @@
         }
 
         function init() {
+            g_elementMain = document.getElementById('main');
             g_menuBuilderCanvas = document.getElementById('menuBuilder');
             g_menuBuilderCanvas.onmousemove = ((event) => {
                     if(g_areasData !== null && g_menuImage !== null) {
@@ -163,6 +166,16 @@
                     window.parent.postMessage(msg, "*");      
                     
                 }
+            }
+
+            g_elementMain.onscroll = (e) => {
+                let scrollLeft = g_elementMain.scrollLeft;
+                let scrollTop = g_elementMain.scrollTop;
+                let bounds = g_elementMain.getBoundingClientRect();
+                let scaledImageWidth = parseInt(g_menuBuilderCanvas.style.width);;
+                let scaledImageHeight = parseInt(g_menuBuilderCanvas.style.height);
+                let prop = scaledImageWidth / g_menuBuilderCanvas.width;
+                console.log(`\n---------\menuStyleWidth:${scaledImageWidth} menuStyleHeight:${scaledImageHeight} prop:${prop} nonscroll:\nscrollLeft:${scrollLeft} scrollTop:${scrollTop}\n----------\n`);
             }
 
             g_menuBuilderCanvas.onmouseup = ((event) => {
@@ -213,8 +226,6 @@
                 updateGraphics();
             }
 
-
-
             g_offscreenCanvas = document.createElement('canvas');
             g_offscreenCanvas.getContext('2d').translate(-.5, -.5);
            
@@ -248,34 +259,33 @@
             }            
         }
 
-        function maybeScrollToMarkedArea() {  
-            return;          
-            // if(g_zoom > 0) {
-                let mainElement = document.getElementById('main');
-                let bounds = mainElement.getBoundingClientRect();
-                
-                let width = bounds.width;
-                let height = bounds.height;
-                let scrollLeft = mainElement.scrollLeft;
-                let scrollTop = mainElement.scrollTop;
+        function maybeScrollToMarkedArea() {              
+            let mainElement = document.getElementById('main');
+            let bounds = mainElement.getBoundingClientRect();
+            
+            let width = bounds.width;
+            let height = bounds.height;
+            let scrollLeft = mainElement.scrollLeft;
+            let scrollTop = mainElement.scrollTop;
 
-                let zoom = (100 + g_zoom) / 100;
-                let propX = g_menuImage.width /  width;
-                let propY = g_menuImage.height / height;      
+            let scaledImageWidth = parseInt(g_menuBuilderCanvas.style.width);;
+            let scaledImageHeight = parseInt(g_menuBuilderCanvas.style.height);
+            let propX = scaledImageWidth / g_menuBuilderCanvas.width;    
+            let propY = scaledImageHeight / g_menuBuilderCanvas.height;
 
-                let rX = g_markedArea.x * zoom;
-                console.log(`rX:${rX} SL:${scrollLeft} ST:${scrollTop}`);
-                if(g_markedArea.x * zoom - mainElement.scrollLeft < g_markedArea.x * zoom || g_markedArea.x * zoom > width * zoom)             
-                    mainElement.scrollLeft =  g_markedArea.x;
+            //console.log(`propX:${propX} markedAreaX:${g_markedArea.x*propX} SL:${scrollLeft*propX} ST:${scrollTop*propY}`);
+            if(g_markedArea.x*propX - scrollLeft < 0) {
+                mainElement.scrollLeft = g_markedArea.x*propX;
+            } else if(g_markedArea.x*propX - scrollLeft > width) {
+                mainElement.scrollLeft = g_markedArea.x*propX;
+            }
 
-                
-                if((g_markedArea.y * zoom)/propX  - mainElement.scrollTop < g_markedArea.y * zoom/propX || (g_markedArea.y * zoom)/propX  > height * zoom )
-                    mainElement.scrollTop = (g_markedArea.y)/propX;
-                
-                
-            // }
-                
-                console.log(`width:${width} height:${height}\n maX:${g_markedArea.x} maY:${g_markedArea.y}\n zoom:${zoom}\n propX:${propX}\n propY:${propY}\n SL:${mainElement.scrollLeft} ST:${mainElement.scrollTop}`);
+            if(g_markedArea.y*propY - scrollTop < 0) {
+                mainElement.scrollTop = g_markedArea.y*propY;
+            } else if(g_markedArea.y*propY - scrollTop > height) {
+                mainElement.scrollTop = g_markedArea.y*propY;
+            }
+            //console.log(`width:${width} height:${height}\n maX:${g_markedArea.x} maY:${g_markedArea.y}\n zoom:${zoom}\n propX:${propX}\n propY:${propY}\n SL:${mainElement.scrollLeft} ST:${mainElement.scrollTop}`);
         }
 
         function userMarkingSelection() {
