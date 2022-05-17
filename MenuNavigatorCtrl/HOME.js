@@ -18,6 +18,10 @@ let g_state = {
 	uploadingExternalImage: false,
 	uploadingExternalImageMsg: '',
 	idGeneratorVal: 0,
+	exporting: false,
+	exportingFailed: false,
+	exportingMsgLine:'',
+	price_warnings: 0,
 }
 
 let g_selectedRowData = null;
@@ -58,6 +62,7 @@ $w.onReady(function () {
 		if(curUrl.indexOf('https://static.wixstatic.com/media') === - 1) {
 			g_state.uploadingExternalImage = true;
 			updateAllControls();
+			console.log('uploading image...');
 			uploadImage(curUrl)
 			.then(res => {
 				let fileUrl = res.fileUrl;
@@ -158,13 +163,16 @@ function recalcTableColWidthsByRowsContent() {
 }
 
 function updateAllControls() {
-	let msgLine = '';
+	validateTableMenuItems();
+
+	let msgLine = '';	
 	let msgTextColor = '#0000FF';
 	let but1_enabled = false;
 	let but2_enabled = false;
 	let but3_enabled = false;
 	let but4_enabled = false;
 	let inp1_enabled = false;
+	let html1_enabled = false;
 	if(g_state.analayzing) {
 		msgLine = 'Analyzing image, please wait...';
 	} else if(g_state.fetchingWordsInfo) {
@@ -177,21 +185,35 @@ function updateAllControls() {
 		but3_enabled = true;
 		but4_enabled = true;
 		inp1_enabled = true;
+		html1_enabled = true;
 	} else if(g_state.uploadingExternalImage) {
 		msgLine = 'uploading url, please wait...';
 	} else if(g_state.uploadingExternalImageFailed) {
 		msgTextColor = '#FF0000';
 		msgLine = g_state.uploadingExternalImageMsg;
 		inp1_enabled = true;
+	} else if(g_state.exporting) {
+		msgLine = 'Exporting menu, please wait...';
+	} else if(g_state.exportingFailed) {
+		msgTextColor = '#FF0000';
+		msgLine = g_state.exportingMsgLine;
+		but1_enabled = true;
+		but2_enabled = true;
+		but3_enabled = true;
+		but4_enabled = true;
+		inp1_enabled = true;
+		html1_enabled = true;
 	}
 	else {
-		msgLine = `Dishes count: ${$w('#table1').rows.length}`;
+		let msgWarning = g_state.price_warnings > 0 ? `<span style="font-size:12px;padding-left:10px;">${g_state.price_warnings}x</span><span style="font-size:12px;color:red;background:yellow;">&#9888;</span>` : ''
+		msgLine = `Dishes count: ${$w('#table1').rows.length} ${msgWarning}`;
 		msgTextColor = '#000000';
 		but1_enabled = true;
 		but2_enabled = true;
 		but3_enabled = true;
 		but4_enabled = true;
 		inp1_enabled = true;
+		html1_enabled = true;
 	}
 
 	g_state.debugMode ? $w('#text8').show() : $w('#text8').hide();
@@ -205,6 +227,8 @@ function updateAllControls() {
 	but3_enabled ? $w('#button3').enable() : $w('#button3').disable();
 	but4_enabled && tableNotEmpty && g_state.msid !== '' ? $w('#button4').enable() : $w('#button4').disable();
 	inp1_enabled ? $w('#input1').enable() : $w('#input1').disable();
+	// html1_enabled ? enabeMenuleNavigator() : disableMenuNavigator();
+	
 }
 
 function resetAllControls() {
@@ -230,6 +254,20 @@ function setNavigatorConfig() {
 			drawUserSelection: true,
 			drawAllAreas: true,
 		}
+	};
+	$w('#html1').postMessage(msg);
+}
+
+function enabeMenuleNavigator() {
+	let msg = {
+		msg: 'enable',
+	};
+	$w('#html1').postMessage(msg);
+}
+
+function disableMenuNavigator() {
+	let msg = {
+		msg: 'disable',
 	};
 	$w('#html1').postMessage(msg);
 }
@@ -278,7 +316,7 @@ function selectTableRowById(id) {
 	let rows = $w('#table1').rows;
 	for(let i=0; i<rows.length; i++) {
 		if(rows[i].id === id) {
-			console.log(`selected row id: ${rows[i].id} index: ${i}`);
+			// console.log(`selected row id: ${rows[i].id} index: ${i}`);
 			$w('#table1').selectRow(i);
 			g_selectedRowData = rows[i];
 			$w('#table1').refresh();
@@ -293,7 +331,7 @@ function tryBuildMenuAnnotations(imageUrl) {
 
 	getMenuAnnotations(imageUrl)
 	.then(res => {
-		console.log(`menuAnnotations:\n${res}`);
+		// console.log(`\nmenuAnnotations:\n${JSON.stringify(res)}`);
 		let wordsInfo = res.map((rv, ri) => {
 			return rv.paragraphs.map((pv, pi) => {
 				return pv.words.map((wv, wi) => {
@@ -390,6 +428,14 @@ function doModal_YesNoDialog(title, message) {
 	return wixWindow.openLightbox('yes_no_dialog', context);
 }
 
+function doModal_OkDialog(title, message) {
+	let context = {
+		title,
+		text: message,
+	};
+	return wixWindow.openLightbox('ok_dialog', context);
+}
+
 function showDirtyWarningDialog() {
 	let title = '<p style="padding:5px; border:1px solid black; border-radius:3px; color:black; background:red; font-weight:bold">Warning!</p>';
 	let msg = '<div style="padding:5px; font-size: 16px;">The changes that you have made to the menu will be lost<br/>if you continue!</div><div style="padding:5px; font-size:16px;">Continue anyway?</div>';
@@ -400,6 +446,24 @@ function showAddNewItemFailedDialog() {
 	let title = '<p style="padding:5px; border:1px solid black; border-radius:3px; color:black; background:red; font-weight:bold">Menu Item Analysis Failed...</p>';
 	let msg = '<div style="padding:5px; font-size: 16px;">Would you like to add a new menu item manually?</div>';
 	return doModal_YesNoDialog(title, msg)
+}
+
+function showAddMultipleNewItemsDialog(itemsCount) {
+	let title = `<p style="padding:5px; border:1px solid black; color:white; background:DarkBlue; border-radius:3px; font-weight:bold;">${itemsCount} New Menu Items Found!</p>`;
+	let msg = `<div style="padding:5px; font-size: 16px;">Would you like to add them to the menu?</div>`;
+	return doModal_YesNoDialog(title, msg);
+}
+
+function showOkDialog(title, message) {
+	let formattedTitle = `<p style="padding:5px; border:1px solid black; color:white; background:DarkBlue; border-radius:3px; font-weight:bold;">${title}</p>`;
+	let formattedMessage = `<div style="padding:5px; font-size: 16px;">${message}</div>`;
+	return doModal_OkDialog(formattedTitle, formattedMessage);
+}
+
+function showErrorDialog(title, message) {
+	let formattedTitle = `<p style="padding:5px; border:1px solid black; color:white; background:DarkRed; border-radius:3px; font-weight:bold;">${title}</p>`;
+	let formattedMessage = `<div style="padding:5px; font-size: 16px;">${message}</div>`;
+	return doModal_OkDialog(formattedTitle, formattedMessage);
 }
 
 function doExtractMenu() {
@@ -434,7 +498,7 @@ function doExtractMenu() {
 
 	extractMenu(imageUrl)
 	.then(data => {
-		console.log(data);
+		// console.log(data);
 
 		clearMenuNavigatorAreasData();
 
@@ -549,35 +613,53 @@ function updateMenuItemFromUserSelectedRect(id, extracted) {
 	updateAllControls();
 
 	let item = rowsFromMenuData(extracted)[0];
-	console.log(JSON.stringify(item));
+	// console.log(JSON.stringify(item));
 	let context = {
 		title: 'Update Dish (from marked region)',
 		showDeleteButton: false,
+		showReproduceButton: true,
 		data: {
 			section_name:item.section_name,
 			item_description: item.item_description,
 			price: item.price,
 		},
 	};
-	console.log(JSON.stringify(context));
+	// console.log(JSON.stringify(context));
 	wixWindow.openLightbox("dish_editor", context)
 	.then( res => {
 		if(res !== null) {
 			g_state.dataDirty = true;
 			let rows = $w('#table1').rows;
-			for(let i=0; i<rows.length; i++) {
-				if(rows[i].id === id) {
-					rows[i]._section_name = `<span style="color:Blue;">${res.section_name}</span>`;					
-					rows[i]._item_description = `<span style="color:Blue;">${res.item_description}</span>`;
-					rows[i]._price = `<span style="color:Blue;">${res.price}</span>`;
-					rows[i].section_name = res.section_name;
-					rows[i].item_description = res.item_description;					
-					rows[i].price = res.price;
-					rows[i].x = item.x;
-					rows[i].y = item.y;
-					rows[i].w = item.w;
-					rows[i].h = item.h;
-					break;
+			if(res.doReproduce) {
+				let newRow = {
+					id: `id_${getNewRowId()}`,				
+					_section_name: `<span style="color:Purple;">${res.section_name}</span>`,				
+					_item_description: `<span style="color:Purple;">${res.item_description}</span>`,
+					_price: `<span style="color:Purple;">${res.price}</span>`,
+					section_name: res.section_name,
+					item_description: res.item_description,
+					price: res.price,
+					x: item.x,
+					y: item.y,
+					w: item.w,
+					h: item.h,
+				};
+				rows.push(newRow);
+			} else {
+				for(let i=0; i<rows.length; i++) {
+					if(rows[i].id === id) {
+						rows[i]._section_name = `<span style="color:Blue;">${res.section_name}</span>`;					
+						rows[i]._item_description = `<span style="color:Blue;">${res.item_description}</span>`;
+						rows[i]._price = `<span style="color:Blue;">${res.price}</span>`;
+						rows[i].section_name = res.section_name;
+						rows[i].item_description = res.item_description;					
+						rows[i].price = res.price;
+						rows[i].x = item.x;
+						rows[i].y = item.y;
+						rows[i].w = item.w;
+						rows[i].h = item.h;
+						break;
+					}
 				}
 			}
 
@@ -593,132 +675,165 @@ function updateMenuItemFromUserSelectedRect(id, extracted) {
 	});
 }
 
+function rectIntersect(r1_x, r1_y, r1_cx, r1_cy, r2_x, r2_y, r2_cx, r2_cy, tx=0, ty=5) {
+            let intersection = !(
+                (r1_x > r2_cx)   ||
+                (r1_cx < r2_x)   ||
+                (r1_y+ty > r2_cy)   ||
+                (r1_cy < r2_y+ty)
+                );
+            return intersection;
+        }
+
+function checkOverlaps(newRows, existingRows) {
+	// console.log('\nCHECKING OVERLAPPS\n');
+	let count = 0;
+	for(let ni=0; ni<newRows.length; ni++) {
+		for(let ei=0; ei<existingRows.length; ei++) {
+			let newRow = newRows[ni];
+			let existingRow = existingRows[ei];
+			let rcNewRow = {x:newRow.x, y:newRow.y, cx:newRow.x+newRow.w, cy:newRow.y+newRow.h};
+			let rcexistingRow = {x:existingRow.x, y:existingRow.y, cx:existingRow.x+existingRow.w, cy:existingRow.y+existingRow.h};
+			// console.log(`nr:${JSON.stringify(rcNewRow)} er:${JSON.stringify(rcexistingRow)}\n`);
+			let foundIntersect = rectIntersect(rcNewRow.x, rcNewRow.y, rcNewRow.cx, rcNewRow.cy, rcexistingRow.x, rcexistingRow.y, rcexistingRow.cx, rcexistingRow.cy);
+			if(foundIntersect) {
+				//console.log(`FOUND INTERSECTION: nr:${JSON.stringify(rcNewRow)} er:${JSON.stringify(rcexistingRow)}\n`);
+				count++;
+			}
+		}
+	}
+	return count > 1;
+}
+
 function addMultipleNewMenuItemByUserSelectionRect(extracted) {
 	if(extracted.groups !== undefined && extracted.groups.length > 1) {
-		g_state.analayzing = false;
-		g_state.analayzingFailed = false;
-		updateAllControls();
-		
+		//Check for overlapps with existing items.
 		let rows = $w('#table1').rows;
-		
-		for(let i=0; i<extracted.groups.length; i++) {
-			console.log(`rows length: ${rows.length}`);
-			let item = rowsFromMenuData(extracted)[i];
-			console.log(JSON.stringify(item));
-			g_state.dataDirty = true;			
-			let newRow = {
-				id: `id_${getNewRowId()}`,				
-				_section_name: `<span style="color:DarkGreen;">${item.section_name}</span>`,				
-				_item_description: `<span style="color:DarkGreen;">${item.item_description}</span>`,
-				_price: `<span style="color:DarkGreen;">${item.price}</span>`,
-				section_name: item.section_name,
-				item_description: item.item_description,
-				price: item.price,
-				x: item.x,
-				y: item.y,
-				w: item.w,
-				h: item.h,
-			};
-			console.log(`added newRow id:${newRow.id}`);
-			rows.push(newRow);			
-		}
-		rows = sortRowsByMenuStructure(rows);
-		$w('#table1').rows = rows;
-		let areasData = rows.map((v,i) => {
-			return {id:v.id, x:v.x, y:v.y, w:v.w, h:v.h};
-			});
-		clearMenuMarkArea();
-		setMenuNavigatorAreasData(areasData);
-		updateAllControls();
-		
+		let extractedRows = rowsFromMenuData(extracted);
 
-			// wixWindow.openLightbox("dish_editor", context)
-			// .then( res => {
-			// 	if(res !== null) {
-			// 		g_state.dataDirty = true;
-			// 		let rows = $w('#table1').rows;
-			// 		let newRow = {
-			// 			id: `id_${rows.length+1}`,				
-			// 			_section_name: `<span style="color:DarkGreen;">${res.section_name}</span>`,				
-			// 			_item_description: `<span style="color:DarkGreen;">${res.item_description}</span>`,
-			// 			_price: `<span style="color:DarkGreen;">${res.price}</span>`,
-			// 			section_name: res.section_name,
-			// 			item_description: res.item_description,
-			// 			price: res.price,
-			// 			x: item.x,
-			// 			y: item.y,
-			// 			w: item.w,
-			// 			h: item.h,
-			// 		};
-			// 		console.log(`new row: ${JSON.stringify(newRow)}`);
-
-			// 		rows.push(newRow);
-			// 		rows = sortRowsByMenuStructure(rows);
-			// 		$w('#table1').rows = rows;
-			// 		let areasData = rows.map((v,i) => {
-			// 			return {id:v.id, x:v.x, y:v.y, w:v.w, h:v.h};
-			// 			});
-			// 		clearMenuMarkArea();
-			// 		setMenuNavigatorAreasData(areasData);
-			// 		updateAllControls();
-			// 	}
-			// });
-		// }
+		showAddMultipleNewItemsDialog(extractedRows.length)
+		.then(res => {
+			if(res.result) {
+				g_state.analayzing = false;
+				g_state.analayzingFailed = false;
+				updateAllControls();
+				
+					for(let i=0; i<extractedRows.length; i++) {
+					let item = extractedRows[i];			
+					//console.log(JSON.stringify(item));
+					g_state.dataDirty = true;			
+					let newRow = {
+						id: `id_${getNewRowId()}`,				
+						_section_name: `<span style="color:DarkGreen;">${item.section_name}</span>`,				
+						_item_description: `<span style="color:DarkGreen;">${item.item_description}</span>`,
+						_price: `<span style="color:DarkGreen;">${item.price}</span>`,
+						section_name: item.section_name,
+						item_description: item.item_description,
+						price: item.price,
+						x: item.x,
+						y: item.y,
+						w: item.w,
+						h: item.h,
+					};
+					//console.log(`added newRow id:${newRow.id}`);
+					rows.push(newRow);			
+				}
+				rows = sortRowsByMenuStructure(rows);
+				$w('#table1').rows = rows;
+				let areasData = rows.map((v,i) => {
+					return {id:v.id, x:v.x, y:v.y, w:v.w, h:v.h};
+					});
+				clearMenuMarkArea();
+				setMenuNavigatorAreasData(areasData);
+				updateAllControls();
+			}
+		});
+		
 	}
 }
 
-function addNewMenuItemByUserSelectionRect(extracted) {
-	if(extracted.groups !== undefined && extracted.groups.length > 1) {
-		return addMultipleNewMenuItemByUserSelectionRect(extracted);
+function isPrice(price) {
+	let _price = price.trim();
+	if(_price.trim().length < 1) {
+		return false;
 	}
 
-	g_state.analayzing = false;
-	g_state.analayzingFailed = false;
-	updateAllControls();
+	const regex = /^([$€£¥]?[\s]{0,}?\d+(?:[.,]\d{0,2})?)$|^(\d+[.,]\d{0,2}[a-zA-Z]{3})$|(^\d+([.,]\d{0,2})?)\x20{0,}([usd|USD|Usd|eur|EUR|Eur]{3})?$/gu;
+	let res = _price.match(regex);
+	
+	return res !== null && res.length === 1;
+}
 
-	let item = rowsFromMenuData(extracted)[0];
-	console.log(JSON.stringify(item));
-	let context = {
-		showDeleteButton: false,
-		title: 'Add New Dish',
-		data: {			
-			section_name:item.section_name,
-			item_description: item.item_description,
-			price: item.price,
-		},
-	};
+function validateTableMenuItems() {
+	let warningCount = 0;
+	let rows = $w('#table1').rows;
+	for(let i=0; i<rows.length; i++) {
+		let row = rows[i];
+		if(isPrice(row.price)) {
+			row._price = `<span style="color:DarkGreen;">${row.price}</span>`;
+		} else {
+			warningCount++;
+			row._price = `<span style="font-size:11px;color:red;background:yellow;">&#9888;</span><span style="color:DarkGreen;">${row.price}</span>`
+		} 	
+	}
+	$w('#table1').rows = rows;
+	g_state.price_warnings = warningCount;
+}
 
-	wixWindow.openLightbox("dish_editor", context)
-	.then( res => {
-		if(res !== null) {
-			g_state.dataDirty = true;
-			let rows = $w('#table1').rows;
-			let newRow = {
-				id: `id_${getNewRowId()}`,				
-				_section_name: `<span style="color:DarkGreen;">${res.section_name}</span>`,				
-				_item_description: `<span style="color:DarkGreen;">${res.item_description}</span>`,
-				_price: `<span style="color:DarkGreen;">${res.price}</span>`,
-				section_name: res.section_name,
-				item_description: res.item_description,
-				price: res.price,
-				x: item.x,
-				y: item.y,
-				w: item.w,
-				h: item.h,
-			};
-			console.log(`new row: ${JSON.stringify(newRow)}`);
 
-			rows.push(newRow);
-			rows = sortRowsByMenuStructure(rows);
-			$w('#table1').rows = rows;
-			let areasData = rows.map((v,i) => {
-				return {id:v.id, x:v.x, y:v.y, w:v.w, h:v.h};
-				});
-			clearMenuMarkArea();
-			setMenuNavigatorAreasData(areasData);
-			updateAllControls();
-		}
-	});
+function addNewMenuItemByUserSelectionRect(extracted) {
+	if(extracted.groups !== undefined && extracted.groups.length > 1) {	
+		addMultipleNewMenuItemByUserSelectionRect(extracted);
+	} else if(extracted.groups !== undefined && extracted.groups.length == 1) {
+		g_state.analayzing = false;
+		g_state.analayzingFailed = false;
+		updateAllControls();
+
+		let item = rowsFromMenuData(extracted)[0];
+		// console.log(JSON.stringify(item));
+		let context = {
+			showDeleteButton: false,
+			showReproduceButton: false,
+			title: 'Add New Dish',
+			data: {			
+				section_name:item.section_name,
+				item_description: item.item_description,
+				price: item.price,
+			},
+		};
+
+		wixWindow.openLightbox("dish_editor", context)
+		.then( res => {
+			if(res !== null) {
+				g_state.dataDirty = true;
+				let rows = $w('#table1').rows;
+				let newRow = {
+					id: `id_${getNewRowId()}`,				
+					_section_name: `<span style="color:DarkGreen;">${res.section_name}</span>`,				
+					_item_description: `<span style="color:DarkGreen;">${res.item_description}</span>`,
+					_price: `<span style="color:DarkGreen;">${res.price}</span><span style="font-size:16px;color:red;background:yellow;">&#9888;</span>`,
+					section_name: res.section_name,
+					item_description: res.item_description,
+					price: res.price,
+					x: item.x,
+					y: item.y,
+					w: item.w,
+					h: item.h,
+				};
+				// console.log(`new row: ${JSON.stringify(newRow)}`);
+
+				rows.push(newRow);
+				rows = sortRowsByMenuStructure(rows);
+				$w('#table1').rows = rows;
+				let areasData = rows.map((v,i) => {
+					return {id:v.id, x:v.x, y:v.y, w:v.w, h:v.h};
+					});
+				clearMenuMarkArea();
+				setMenuNavigatorAreasData(areasData);
+				updateAllControls();
+			}
+		});
+	}
 }
 
 function manuallyAddNewItem(areadata, extracted) {
@@ -764,7 +879,7 @@ export function table1_cellSelect_1(event) {
 
 		if(event.target !== null && event.target.rows !== null) {
 			let rowData = event.target.rows[event.cellRowIndex];
-			console.log(JSON.stringify(rowData));
+			// console.log(JSON.stringify(rowData));
 			setMenuMarkedArea(rowData.x, rowData.y, rowData.w, rowData.h)
 		}
 	}catch(err) {
@@ -782,7 +897,7 @@ export function table1_rowSelect(event) {
 	// Add your code for this event here: 
 	let rowData = event.rowData;
 	g_selectedRowData = event.rowData;
-	console.log(JSON.stringify(rowData));
+	// console.log(JSON.stringify(rowData));
 	setMenuMarkedArea(rowData.x, rowData.y, rowData.w, rowData.h);
 	//wixWindow.copyToClipboard(`${rowData.section_name} - ${rowData.item_description} - ${rowData.price}`);
 }
@@ -829,80 +944,86 @@ export function input1_input(event) {
 export function html1_message(event) {
 	// This function was added from the Properties & Events panel. To learn more, visit http://wix.to/UcBnC-4
 	// Add your code for this event here: 
-	console.log('htmlevent handler');
+	// console.log('htmlevent handler');
 	if(event.data !== undefined ) {
 		let data = event.data;
 		if(data.msg === 'areaSelected') {
 			if(data.areaDataValid) {
 				let areaData = data.areaData;
-				console.log(areaData.id);
+				// console.log(areaData.id);
 				selectTableRowById(areaData.id);
 				if(data.userSelectedRectValid) {
-					console.log(`update item<${areaData.id}> from user rect: ${JSON.stringify(data.userSelectedRect)}`);
+					// console.log(`update item<${areaData.id}> from user rect: ${JSON.stringify(data.userSelectedRect)}`);
 					//TODO: if data.userSelectedRectValid - call rescan menu with the coords and update the item with the returned values.
 					let imageUrl = $w('#input1').value;
 					let x = data.userSelectedRect.x;
 					let y = data.userSelectedRect.y;
 					let w = data.userSelectedRect.w;
 					let h= data.userSelectedRect.h;
-					let url = `https://www.wix.com/eureka/content/img/ocr/extract?url=${imageUrl}&l=3&c=true&g=true&a=&p=${x},${y},${w},${h}`;
-					console.log(url);
-					g_state.analayzing = true;
-					g_state.analayzingFailed = false;
-					updateAllControls();
-					extractMenuFromCoords(imageUrl, x, y, w, h)
-					.then(extracted => {	
-						console.log(`extracted: ${JSON.stringify(extracted)}`);					
-						updateMenuItemFromUserSelectedRect(areaData.id, extracted);
-					})
-					.catch( (err) => {						
-						g_state.analayzingFailed = true;
-						g_state.analyzingFailedMsgLine = `Update item Failed - ${JSON.stringify(err.res)}`;
+					let oevrlapped = checkOverlaps([data.userSelectedRect], $w('#table1').rows);
+					if(!oevrlapped) {
+						let url = `https://www.wix.com/eureka/content/img/ocr/extract?url=${imageUrl}&l=3&c=true&g=true&a=&p=${x},${y},${w},${h}`;
+						// console.log(url);
+						g_state.analayzing = true;
+						g_state.analayzingFailed = false;
 						updateAllControls();
-					})
-					.finally( () => {
-						g_state.analayzing = false;
-						updateAllControls();
-					});
+						extractMenuFromCoords(imageUrl, x, y, w, h)
+						.then(extracted => {	
+							// console.log(`extracted: ${JSON.stringify(extracted)}`);					
+							updateMenuItemFromUserSelectedRect(areaData.id, extracted);
+						})
+						.catch( (err) => {						
+							g_state.analayzingFailed = true;
+							g_state.analyzingFailedMsgLine = `Update item Failed - ${JSON.stringify(err.res)}`;
+							updateAllControls();
+						})
+						.finally( () => {
+							g_state.analayzing = false;
+							updateAllControls();
+						});
+					} 
 				}
 			} else if(data.userSelectedRectValid) {
-				console.log(`add new item from user rect: ${JSON.stringify(data.userSelectedRect)}`);
+				// console.log(`add new item from user rect: ${JSON.stringify(data.userSelectedRect)}`);
 				//TODO: call rescan menu with the coords and add a new item with the returned values to the menu and init the table and navigator .
 				let imageUrl = $w('#input1').value;
 					let x = data.userSelectedRect.x;
 					let y = data.userSelectedRect.y;
 					let w = data.userSelectedRect.w;
 					let h= data.userSelectedRect.h;
-					let url = `https://www.wix.com/eureka/content/img/ocr/extract?url=${imageUrl}&l=3&c=true&g=true&a=&p=${x},${y},${w},${h}`;
-					console.log(url);
-					g_state.analayzing = true;
-					g_state.analayzingFailed = false;
-					updateAllControls();
-					extractMenuFromCoords(imageUrl, x, y, w, h)
-					.then(extracted => {
-						console.log(`extracted: ${JSON.stringify(extracted)}`);
-						addNewMenuItemByUserSelectionRect(extracted);						
-					})
-					.catch( err => {
-						g_state.analayzingFailed = true;
-						g_state.analyzingFailedMsgLine = `Add new item Failed - ${JSON.stringify(err.res)}`;						
+					let oevrlapped = checkOverlaps([data.userSelectedRect], $w('#table1').rows);
+					if(!oevrlapped) {
+						let url = `https://www.wix.com/eureka/content/img/ocr/extract?url=${imageUrl}&l=3&c=true&g=true&a=&p=${x},${y},${w},${h}`;
+						// console.log(url);
+						g_state.analayzing = true;
+						g_state.analayzingFailed = false;
 						updateAllControls();
-						manuallyAddNewItem(data.userSelectedRect, err.data);
-						// showAddNewItemFailedDialog()						
-						// .then( res => {
-						// 	if(res.result) {
-						// 		manuallyAddNewItem(err.data);
-						// 	}
-						// })
-					})
-					.finally( () => {
-						g_state.analayzing = false;
-						updateAllControls();
-					});
+						extractMenuFromCoords(imageUrl, x, y, w, h)
+						.then(extracted => {
+							// console.log(`extracted: ${JSON.stringify(extracted)}`);
+							addNewMenuItemByUserSelectionRect(extracted);						
+						})
+						.catch( err => {
+							g_state.analayzingFailed = true;
+							g_state.analyzingFailedMsgLine = `Add new item Failed - ${JSON.stringify(err.res)}`;						
+							updateAllControls();
+							manuallyAddNewItem(data.userSelectedRect, err.data);
+							// showAddNewItemFailedDialog()						
+							// .then( res => {
+							// 	if(res.result) {
+							// 		manuallyAddNewItem(err.data);
+							// 	}
+							// })
+						})
+						.finally( () => {
+							g_state.analayzing = false;
+							updateAllControls();
+						});
+					}
 			}
 		} else if(data.msg === 'areaSelected-dblclick') {
 			let areaData = data.areaData;
-				console.log(areaData.id);
+				// console.log(areaData.id);
 				selectTableRowById(areaData.id);
 				updateSelectedRow();
 		} else if(data.msg === 'imageUnloaded') {			
@@ -927,6 +1048,7 @@ function updateSelectedRow() {
 		let data = {
 			title: 'Edit Selected Dish',
 			showDeleteButton: true,
+			showReproduceButton: true,
 			data: g_selectedRowData,
 		}	
 		wixWindow.openLightbox("dish_editor", data)
@@ -935,6 +1057,23 @@ function updateSelectedRow() {
 				g_state.dataDirty = true;				
 				if(res.section_name === null && res.item_description === null && res.price === null) {													
 					deleteRowFromTable(g_selectedRowData.id, res);
+				} else if(res.doReproduce) {
+					let newRow = {
+						id: `id_${getNewRowId()}`,				
+						_section_name: `<span style="color:Purple;">${res.section_name}</span>`,				
+						_item_description: `<span style="color:Purple;">${res.item_description}</span>`,
+						_price: `<span style="color:Purple;">${res.price}</span>`,
+						section_name: res.section_name,
+						item_description: res.item_description,
+						price: res.price,
+						x: 0,
+						y: 0,
+						w: 0,
+						h: 0,
+					};
+					rows.push(newRow);
+					$w('#table1').rows = rows;
+					selectTableRowById(newRow.id);
 				} else {
 					for(let i=0; i<rows.length; i++) {
 						if(rows[i].id === g_selectedRowData.id) {
@@ -950,7 +1089,8 @@ function updateSelectedRow() {
 						}
 					}
 					}
-			}
+					updateAllControls();
+				}
 		})	
 	}
 }
@@ -992,19 +1132,14 @@ export function button4_click(event) {
 	// This function was added from the Properties & Events panel. To learn more, visit http://wix.to/UcBnC-4
 	// Add your code for this event here:
 	g_state.analayzing = false; 
-	g_state.analayzingFailed = false;
-	//g_state.analyzingFailedMsgLine = 'Not implemented yet...';
+	g_state.analayzingFailed = false;	
 	updateAllControls();
 	let rows = $w('#table1').rows;
 	let exportRows = rows.map((v,i) => {
 		return {
-			item_name: v.section_name,
-			item_description: v.item_description,
+			item_name: v.section_name.length < 1 ? (`${v.section_name} ${v.item_description}`).trim() : v.section_name,
+			item_description: v.section_name.length < 1 ? '' : v.item_description,
 			price: v.price,
-			// x: v.x,
-			// y: v.y,
-			// w: v.w,
-			// h: v.h,
 		}
 	});	
 
@@ -1014,15 +1149,34 @@ export function button4_click(event) {
 	}
 	wixWindow.openLightbox('exporter', context)
 	.then(res => {
-		let imgUrl = g_state.lastValidImgUrl;
-		//TODO: call the imprt endpoint with params id=g_state.msid&url=g_state.lastValidImgUrl
-		exportMenu(g_state.msid, g_state.lastValidImgUrl, exportRows)
-		.then(res => {
-			console.log(`exportMenu result: ${JSON.stringify(res)}`);
-		})
-		.catch(err => {
-			console.log(`exportMenu error: ${JSON.stringify(err)}`);
-		});
+		if(res.result) {
+			g_state.exporting = true;
+			g_state.exportingFailed = false;	
+			updateAllControls();		
+			let imgUrl = g_state.lastValidImgUrl;
+			exportMenu(g_state.msid, g_state.lastValidImgUrl, exportRows)
+			.then(res => {	
+				// console.log(`exportMenu result: ${JSON.stringify(res)}`);
+				showOkDialog('Menu Exported Successfully!', '<p style="padding:5px;">Go visit your website dashboard menus section.</p><p style="padding:5px;">Note: If the menu does not show in the your website dashboard menus section, please refresh it.</p>')
+				.then(res => {
+					g_state.exporting = false;
+					updateAllControls();
+				})
+			})
+			.catch(err => {
+				g_state.exporting = false;
+				g_state.exportingFailed = true;
+				updateAllControls();
+				// console.log(`exportMenu error: ${JSON.stringify(err)}`);
+				let errorMessage = getTruncatedText(JSON.stringify(err), 250, '...');
+				showErrorDialog('Menu Export Failed!', `Reason:\n${errorMessage}`)
+				.then(res => {
+					g_state.exporting = false;
+					g_state.exportingFailed = false;
+					updateAllControls();
+				})
+			});			
+		}
 	});
 }
 
