@@ -685,14 +685,11 @@ function isPrice(price) {
 	if(_price.trim().length < 1) {
 		return false;
 	}
-	if(_price.split(' ').length > 1) {
-		return false;
-	}
 
-	let regex = /\d+(?:[.,]\d{0,2})?/
-	let res = _price.match(regex) !== null;
-	console.log(res);
-	return res;
+	const regex = /^([$€£¥]?[\s]{0,}?\d+(?:[.,]\d{0,2})?)$|^(\d+[.,]\d{0,2}[a-zA-Z]{3})$|(^\d+([.,]\d{0,2})?)\x20{0,}([usd|USD|Usd|eur|EUR|Eur]{3})?$/gu;
+	let res = _price.match(regex);
+	
+	return res !== null && res.length === 1;
 }
 
 function validateTableMenuItems() {
