@@ -1146,6 +1146,7 @@ export function button4_click(event) {
 	let context = {
 		title: 'Export Menu',
 		data: JSON.stringify(exportRows, null, 2),
+		price_warnings: g_state.price_warnings,
 	}
 	wixWindow.openLightbox('exporter', context)
 	.then(res => {
