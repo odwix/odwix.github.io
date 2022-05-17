@@ -685,8 +685,7 @@ function isPrice(price) {
 	if(_price.trim().length < 1) {
 		return false;
 	}
-
-	const regex = /^([$€£¥]?[\s]{0,}?\d+(?:[.,]\d{0,2})?)$|^(\d+[.,]\d{0,2}[a-zA-Z]{3})$|(^\d+([.,]\d{0,2})?)\x20{0,}([usd|USD|Usd|eur|EUR|Eur]{3})?$/gu;
+	const regex = /^([$€£¥]?\x20{0,}?\d{0,}(?:[.,]\d{0,2})?)$|^(\d?[.,]\d{0,2}[a-zA-Z]{3})$|(^\d+([.,]\d{0,2})?)\x20{0,}([usd|USD|Usd|eur|EUR|Eur]{3})?$/ug;
 	let res = _price.match(regex);
 	
 	return res !== null && res.length === 1;
@@ -739,7 +738,7 @@ function addNewMenuItemByUserSelectionRect(extracted) {
 					id: `id_${getNewRowId()}`,				
 					_section_name: `<span style="color:DarkGreen;">${res.section_name}</span>`,				
 					_item_description: `<span style="color:DarkGreen;">${res.item_description}</span>`,
-					_price: `<span style="color:DarkGreen;">${res.price}</span><span style="font-size:16px;color:red;background:yellow;">&#9888;</span>`,
+					_price: `<span style="color:DarkGreen;">${res.price}</span>`,
 					section_name: res.section_name,
 					item_description: res.item_description,
 					price: res.price,
