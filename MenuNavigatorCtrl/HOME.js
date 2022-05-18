@@ -22,6 +22,7 @@ let g_state = {
 	exportingFailed: false,
 	exportingMsgLine:'',
 	price_warnings: 0,
+	name_warnings: 0,
 }
 
 let g_selectedRowData = null;
@@ -205,7 +206,8 @@ function updateAllControls() {
 		html1_enabled = true;
 	}
 	else {
-		let msgWarning = g_state.price_warnings > 0 ? `<span style="font-size:12px;padding-left:10px;">${g_state.price_warnings}x</span><span style="font-size:12px;color:red;background:yellow;">&#9888;</span>` : ''
+		let totalWarnings = g_state.price_warnings + g_state.name_warnings;
+		let msgWarning = totalWarnings > 0 ? `<span style="font-size:12px;padding-left:10px;">${totalWarnings}x</span><span style="font-size:12px;color:red;background:yellow;">&#9888;</span>` : ''
 		msgLine = `Dishes count: ${$w('#table1').rows.length} ${msgWarning}`;
 		msgTextColor = '#000000';
 		but1_enabled = true;
@@ -387,6 +389,7 @@ function rowsFromMenuData(data) {
 
 			let item = {
 				id: `id_${getNewRowId()}`,
+				_color: 'Black',
 				_section_name: name,
 				section_name: name,
 				_item_description: description,
@@ -631,11 +634,13 @@ function updateMenuItemFromUserSelectedRect(id, extracted) {
 			g_state.dataDirty = true;
 			let rows = $w('#table1').rows;
 			if(res.doReproduce) {
+				let color = 'Purple';
 				let newRow = {
-					id: `id_${getNewRowId()}`,				
-					_section_name: `<span style="color:Purple;">${res.section_name}</span>`,				
-					_item_description: `<span style="color:Purple;">${res.item_description}</span>`,
-					_price: `<span style="color:Purple;">${res.price}</span>`,
+					id: `id_${getNewRowId()}`,	
+					_color: color,			
+					_section_name: `<span style="color:${color};">${res.section_name}</span>`,				
+					_item_description: `<span style="color:${color};">${res.item_description}</span>`,
+					_price: `<span style="color:${color};">${res.price}</span>`,
 					section_name: res.section_name,
 					item_description: res.item_description,
 					price: res.price,
@@ -647,10 +652,12 @@ function updateMenuItemFromUserSelectedRect(id, extracted) {
 				rows.push(newRow);
 			} else {
 				for(let i=0; i<rows.length; i++) {
+					let color = 'Blue';
 					if(rows[i].id === id) {
-						rows[i]._section_name = `<span style="color:Blue;">${res.section_name}</span>`;					
-						rows[i]._item_description = `<span style="color:Blue;">${res.item_description}</span>`;
-						rows[i]._price = `<span style="color:Blue;">${res.price}</span>`;
+						rows[i]._color = color;
+						rows[i]._section_name = `<span style="color:${color};">${res.section_name}</span>`;					
+						rows[i]._item_description = `<span style="color:${color};">${res.item_description}</span>`;
+						rows[i]._price = `<span style="color:${color};">${res.price}</span>`;
 						rows[i].section_name = res.section_name;
 						rows[i].item_description = res.item_description;					
 						rows[i].price = res.price;
@@ -721,12 +728,14 @@ function addMultipleNewMenuItemByUserSelectionRect(extracted) {
 					for(let i=0; i<extractedRows.length; i++) {
 					let item = extractedRows[i];			
 					//console.log(JSON.stringify(item));
-					g_state.dataDirty = true;			
+					g_state.dataDirty = true;	
+					let color = 'DarkGreen';		
 					let newRow = {
-						id: `id_${getNewRowId()}`,				
-						_section_name: `<span style="color:DarkGreen;">${item.section_name}</span>`,				
-						_item_description: `<span style="color:DarkGreen;">${item.item_description}</span>`,
-						_price: `<span style="color:DarkGreen;">${item.price}</span>`,
+						id: `id_${getNewRowId()}`,
+						_color: color,				
+						_section_name: `<span style="color:${color};">${item.section_name}</span>`,				
+						_item_description: `<span style="color:${color};">${item.item_description}</span>`,
+						_price: `<span style="color:${color};">${item.price}</span>`,
 						section_name: item.section_name,
 						item_description: item.item_description,
 						price: item.price,
@@ -764,20 +773,53 @@ function isPrice(price) {
 	return res !== null && res.length === 1;
 }
 
+function isValidProductName(name) {
+	return name.trim().length > 0;
+}
+
+function countOfProductsWithNames(rows) {
+	return rows.filter(v => v.section_name.length > 0).length;
+}
+
 function validateTableMenuItems() {
 	let warningCount = 0;
+	let nameWarningCount = 0;
 	let rows = $w('#table1').rows;
+	const productsWithName = countOfProductsWithNames(rows);
+	const productsWithNamesPercentag = productsWithName / rows.length * 100.0;
+	console.log(`productsWithNamesPercentag:${productsWithNamesPercentag} named:${productsWithName} length:${rows.length}`);
 	for(let i=0; i<rows.length; i++) {
 		let row = rows[i];
+		let color = row._color;
+
 		if(isPrice(row.price)) {
-			row._price = `<span style="color:DarkGreen;">${row.price}</span>`;
+			row._price = `<span style="color:${color};">${row.price}</span>`;
 		} else {
 			warningCount++;
-			row._price = `<span style="font-size:11px;color:red;background:yellow;">&#9888;</span><span style="color:DarkGreen;">${row.price}</span>`
+			
+			row._price = `<span style="font-size:11px;color:red;background:yellow;">&#9888;</span><span style="color:${color};">${row.price}</span>`
 		} 	
+
+		if(!isValidProductName(row.section_name) && row.item_description.length < 1) {
+			nameWarningCount += 2;
+			row._section_name = `<span style="font-size:11px;color:red;background:yellow;">&#9888;</span>`;
+			row._item_description = row._section_name;
+		} else {
+			if(productsWithNamesPercentag > 50) {
+				if(isValidProductName(row.section_name)) {
+					row._section_name = `<span style="color:${color};">${row.section_name}</span>`;
+				} else {
+					nameWarningCount++;
+					row._section_name = `<span style="font-size:11px;color:red;background:yellow;">&#9888;</span><span style="color:${color};">${row.section_name}</span>`;
+				}
+			} else {
+				row._section_name = `<span style="color:${color};">${row.section_name}</span>`;
+			}
+		}
 	}
 	$w('#table1').rows = rows;
 	g_state.price_warnings = warningCount;
+	g_state.name_warnings = nameWarningCount;
 }
 
 
@@ -807,11 +849,13 @@ function addNewMenuItemByUserSelectionRect(extracted) {
 			if(res !== null) {
 				g_state.dataDirty = true;
 				let rows = $w('#table1').rows;
+				let color = 'DarkGreen';
 				let newRow = {
-					id: `id_${getNewRowId()}`,				
-					_section_name: `<span style="color:DarkGreen;">${res.section_name}</span>`,				
-					_item_description: `<span style="color:DarkGreen;">${res.item_description}</span>`,
-					_price: `<span style="color:DarkGreen;">${res.price}</span>`,
+					id: `id_${getNewRowId()}`,
+					_color: color,				
+					_section_name: `<span style="color:${color};">${res.section_name}</span>`,				
+					_item_description: `<span style="color:${color};">${res.item_description}</span>`,
+					_price: `<span style="color:${color};">${res.price}</span>`,
 					section_name: res.section_name,
 					item_description: res.item_description,
 					price: res.price,
@@ -1058,11 +1102,13 @@ function updateSelectedRow() {
 				if(res.section_name === null && res.item_description === null && res.price === null) {													
 					deleteRowFromTable(g_selectedRowData.id, res);
 				} else if(res.doReproduce) {
+					let color = 'Purple';
 					let newRow = {
-						id: `id_${getNewRowId()}`,				
-						_section_name: `<span style="color:Purple;">${res.section_name}</span>`,				
-						_item_description: `<span style="color:Purple;">${res.item_description}</span>`,
-						_price: `<span style="color:Purple;">${res.price}</span>`,
+						id: `id_${getNewRowId()}`,	
+						_color: color,			
+						_section_name: `<span style="color:${color};">${res.section_name}</span>`,				
+						_item_description: `<span style="color:${color};">${res.item_description}</span>`,
+						_price: `<span style="color:${color};">${res.price}</span>`,
 						section_name: res.section_name,
 						item_description: res.item_description,
 						price: res.price,
@@ -1077,12 +1123,14 @@ function updateSelectedRow() {
 				} else {
 					for(let i=0; i<rows.length; i++) {
 						if(rows[i].id === g_selectedRowData.id) {
+							let color = 'DarkOrange';
+							rows[i]._color = color;
 							rows[i].section_name = res.section_name;
 							rows[i].item_description = res.item_description;
 							rows[i].price = res.price;
-							rows[i]._section_name = `<span style="color:DarkOrange">${res.section_name}</span>`;
-							rows[i]._item_description = `<span style="color:DarkOrange">${res.item_description}</span>`;
-							rows[i]._price = `<span style="color:DarkOrange">${res.price}</span>`;
+							rows[i]._section_name = `<span style="color:${color}">${res.section_name}</span>`;
+							rows[i]._item_description = `<span style="color:${color}">${res.item_description}</span>`;
+							rows[i]._price = `<span style="color:${color}">${res.price}</span>`;
 							$w('#table1').rows = rows;
 							$w('#table1').selectRow(i);
 							break;
@@ -1147,6 +1195,7 @@ export function button4_click(event) {
 		title: 'Export Menu',
 		data: JSON.stringify(exportRows, null, 2),
 		price_warnings: g_state.price_warnings,
+		name_warnings: g_state.name_warnings,
 	}
 	wixWindow.openLightbox('exporter', context)
 	.then(res => {
