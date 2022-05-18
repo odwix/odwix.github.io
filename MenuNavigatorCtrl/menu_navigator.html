@@ -2,7 +2,7 @@
     <body onload="init();">     
 
     <script>
-        let g_areasData = null;
+        let g_areasData = [];
         var g_menuImage = null;
         var g_menuBuilderCanvas = null;
         var g_offscreenCanvas = null;
@@ -85,10 +85,13 @@
                     g_drawMarkedArea = false;
                     updateGraphics();
                 } else if(eventData.msg === 'setAllAreas') {
-                    g_areasData = eventData.areasData;     
+                    g_areasData = [];
+                    if(eventData.areasData !== null) {
+                        g_areasData = eventData.areasData;     
+                    }
                     updateGraphics();      
                 } else if(eventData.msg === 'clearAllAreas') {
-                    g_areasData = null;
+                    g_areasData = [];
                     g_wordsInfo = [];
                     updateGraphics();
                 } else if(eventData.msg === 'setWordsInfo') {
@@ -126,7 +129,7 @@
             g_elementMain = document.getElementById('main');
             g_menuBuilderCanvas = document.getElementById('menuBuilder');
             g_menuBuilderCanvas.onmousemove = ((event) => {
-                    if(g_areasData !== null && g_menuImage !== null) {
+                    if((g_areasData.length > 0 || g_wordsInfo.length > 0) && g_menuImage !== null) {
                     let rc = g_menuBuilderCanvas.getBoundingClientRect();
                     
                     let rx = g_menuImage.width / rc.width;
@@ -144,7 +147,7 @@
 
         
             function notifySelectedArea(command, event) {
-                if(g_areasData !== null && g_menuImage !== null) {                                   
+                if((g_areasData.length > 0 || g_wordsInfo.length > 0) && g_menuImage !== null) {                                   
                     let i = areaIndexFromMousePos();
                     let areadDataValid = i > -1;    
                     const [rcLeft, rcTop, rcRight, rcBottom] = getSelectedWordsBoundingRect();  
@@ -152,7 +155,7 @@
                     let msg = {
                         msg: command,
                         areaDataValid: areadDataValid,
-                        areaData: g_areasData[i],
+                        areaData: g_areasData.length > 0 ? g_areasData[i] : {},
                         userSelectedRectValid: userSelectedRectValid,
                         userSelectedRect: {
                             x: userSelectedRectValid ? parseInt(rcLeft) : -1,
@@ -292,19 +295,17 @@
             return g_config.drawUserSelection && Math.abs(g_mouseX- g_selectionRectOrgX) > 10 && Math.abs(g_mouseY - g_selectionRectOrgY) > 3;
         }
 
-        function areaIndexFromMousePos() {
-            if(g_areasData !== null) {
-                for(let i=0; i<g_areasData.length; i++) {
-                    if(
-                        g_mouseX > g_areasData[i].x &&
-                        g_mouseX < g_areasData[i].x + g_areasData[i].w &&
-                        g_mouseY > g_areasData[i].y &&
-                        g_mouseY < g_areasData[i].y + g_areasData[i].h
-                    ) {
-                        return i;
-                    }
+        function areaIndexFromMousePos() {            
+            for(let i=0; i<g_areasData.length; i++) {
+                if(
+                    g_mouseX > g_areasData[i].x &&
+                    g_mouseX < g_areasData[i].x + g_areasData[i].w &&
+                    g_mouseY > g_areasData[i].y &&
+                    g_mouseY < g_areasData[i].y + g_areasData[i].h
+                ) {
+                    return i;
                 }
-            }
+            }            
             return -1;
         }
 
@@ -529,7 +530,7 @@
             }
 
             
-            if(g_areasData !== null) {
+            if(g_areasData.length > 0) {
                 ctx.save();
                 if(g_config.drawAllAreas) {
                     for(let i=0; i<g_areasData.length; i++) {
