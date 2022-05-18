@@ -14,13 +14,14 @@ $w.onReady(function () {
 	$w('#text1').text = title;	
 	$w("#textBox1").value = context.data;
 
+	const totalWarnings = context.price_warnings + context.name_warnings;
 	const warningEmojiSpan = '<span style="font-size:16px;color:red;background:yellow;">&#9888;</span>';
 	const emojiStyle = '"padding:5px;font-size:16px;"';
 	const msgStyle = '"font-size:16px;"';
 	const msgZeroWarnings = `<span style=${msgStyle}>Would you like to export the menu to your website?</span>`;
-	const msgSingleWarning = `${warningEmojiSpan}<span style=${emojiStyle}>There is 1 price warning.</span></br><span style=${msgStyle}>Would you like to export the menu to your website anyway?</span>`;;
-	const msgMultiWarnings = `${warningEmojiSpan}<span style=${emojiStyle}>There are ${context.price_warnings} price warnings.</span></br><span style=${msgStyle}>Would you like to export the menu to your website anyway?</span>`;
-	$w('#text2').html = context.price_warnings === 0 ? msgZeroWarnings : context.price_warnings === 1 ? msgSingleWarning : msgMultiWarnings;
+	const msgSingleWarning = `${warningEmojiSpan}<span style=${emojiStyle}>There is 1 warning.</span></br><span style=${msgStyle}>Would you like to export the menu to your website anyway?</span>`;;
+	const msgMultiWarnings = `${warningEmojiSpan}<span style=${emojiStyle}>There are ${totalWarnings} warnings.</span></br><span style=${msgStyle}>Would you like to export the menu to your website anyway?</span>`;
+	$w('#text2').html = totalWarnings === 0 ? msgZeroWarnings : totalWarnings === 1 ? msgSingleWarning : msgMultiWarnings;
 });
 
 /**
