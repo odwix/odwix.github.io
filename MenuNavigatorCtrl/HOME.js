@@ -23,6 +23,7 @@ let g_state = {
 	exportingMsgLine:'',
 	price_warnings: 0,
 	name_warnings: 0,
+	extracted_sections: [],
 }
 
 let g_selectedRowData = null;
@@ -117,7 +118,7 @@ function initTableCols(colWidth1=140, colWidth2=480, colWidth3=50) {
 	$w('#table1').columns = [
 		{
 			"id": "col0",
-			"dataPath": "_section_name",
+			"dataPath": "_item_name",
 			"label": "Name",
 			"width": colWidth1,
 			"visible": true,
@@ -151,7 +152,7 @@ function recalcTableColWidthsByRowsContent() {
 	let maxNameLegth = 0;
 	let maxDescLength = 0;
 	for(let i=0; i<rows.length; i++) {
-		let name =rows[i].section_name;
+		let name =rows[i].item_name;
 		let desc = rows[i].item_description;
 		maxNameLegth = name.length > maxNameLegth ? name.length : maxNameLegth;
 		maxDescLength = desc.length > maxDescLength ? desc.length : maxDescLength;
@@ -174,6 +175,8 @@ function updateAllControls() {
 	let but4_enabled = false;
 	let inp1_enabled = false;
 	let html1_enabled = false;
+	let upload_but_enabled = false;
+	let properties_but_enabled = false;
 	if(g_state.analayzing) {
 		msgLine = 'Analyzing image, please wait...';
 	} else if(g_state.fetchingWordsInfo) {
@@ -187,6 +190,8 @@ function updateAllControls() {
 		but4_enabled = true;
 		inp1_enabled = true;
 		html1_enabled = true;
+		upload_but_enabled = true;
+		properties_but_enabled = true;
 	} else if(g_state.uploadingExternalImage) {
 		msgLine = 'uploading url, please wait...';
 	} else if(g_state.uploadingExternalImageFailed) {
@@ -204,6 +209,8 @@ function updateAllControls() {
 		but4_enabled = true;
 		inp1_enabled = true;
 		html1_enabled = true;
+		upload_but_enabled = true;
+		properties_but_enabled = true;
 	}
 	else {
 		let totalWarnings = g_state.price_warnings + g_state.name_warnings;
@@ -216,6 +223,8 @@ function updateAllControls() {
 		but4_enabled = true;
 		inp1_enabled = true;
 		html1_enabled = true;
+		upload_but_enabled = true;
+		properties_but_enabled = true;
 	}
 
 	g_state.debugMode ? $w('#text8').show() : $w('#text8').hide();
@@ -229,6 +238,8 @@ function updateAllControls() {
 	but3_enabled ? $w('#button3').enable() : $w('#button3').disable();
 	but4_enabled && tableNotEmpty && g_state.msid !== '' ? $w('#button4').enable() : $w('#button4').disable();
 	inp1_enabled ? $w('#input1').enable() : $w('#input1').disable();
+	upload_but_enabled ? $w('#uploadButton1').enable() : $w('#uploadButton1').disable();
+	properties_but_enabled ? $w('#button7').enable() : $w('#button7').disable();
 	// html1_enabled ? enabeMenuleNavigator() : disableMenuNavigator();
 	
 }
@@ -275,7 +286,7 @@ function disableMenuNavigator() {
 }
 
 function setMenuCtrlImage(imgUrl) {
-	let fixedImgUrl = imgUrl.indexOf('https://static.wixstatic.com/media/') === 0 ? `${imgUrl}/v1/fit/w_2000,h_2000/img.png` : '';
+	let fixedImgUrl = imgUrl; //imgUrl.indexOf('https://static.wixstatic.com/media/') === 0 ? `${imgUrl}/v1/fit/w_2000,h_2000/img.png` : '';
 	let msg = {
 		msg: 'setImage',
 		src: fixedImgUrl,
@@ -285,11 +296,13 @@ function setMenuCtrlImage(imgUrl) {
 }
 
 function setMenuMarkedArea(x,y,w,h) {
-	let msg = {
-		msg: 'markArea',
-		markArea: {x,y,w,h},
+	if(w > 1 && h > 1) {
+		let msg = {
+			msg: 'markArea',
+			markArea: {x,y,w,h},
+		}
+		$w('#html1').postMessage(msg);
 	}
-	$w('#html1').postMessage(msg);
 }
 
 function clearMenuMarkArea() {
@@ -345,6 +358,7 @@ function tryBuildMenuAnnotations(imageUrl) {
 			msg: 'setWordsInfo',
 			wordsInfo,
 		}
+		// console.log(JSON.stringify(wordsInfo));
 		$w("#html1").postMessage(msg);
 	})
 	.finally( () => {
@@ -390,10 +404,12 @@ function rowsFromMenuData(data) {
 			let item = {
 				id: `id_${getNewRowId()}`,
 				_color: 'Black',
-				_section_name: name,
-				section_name: name,
+				_item_name: name,
+				item_name: name,
 				_item_description: description,
 				item_description: description,
+				_section:  '',
+				section: '',
 				_price: price,
 				price: price,
 				x, y, w, h, nx, ny
@@ -421,6 +437,16 @@ function sortRowsByMenuStructure(rows) {
 			} 
 			return 0;
 		})
+}
+
+function updateExtractedSections(section) {
+	if(section !== undefined && section.trim().length > 0) {
+		console.log(`extracted sections:${g_state.extracted_sections} section:${section}`);
+		let found = g_state.extracted_sections.find((v,i) => v.toLowerCase() === section.toLowerCase());
+		if(found === undefined) {
+			g_state.extracted_sections.push(section);
+		}
+	}
 }
 
 function doModal_YesNoDialog(title, message) {
@@ -469,6 +495,21 @@ function showErrorDialog(title, message) {
 	return doModal_OkDialog(formattedTitle, formattedMessage);
 }
 
+function showPropertiesDialog() {
+	let context = {
+		title: `<p style="padding:5px; border:1px solid black; color:white; background:black; border-radius:3px; font-weight:bold;">Menu Properties</p>`,
+		sections: [],
+		tax_global: 0,
+	};
+
+	wixWindow.openLightbox("properties_dialog", context) 
+	.then(res => {
+		if(res !== undefined && res !== null && res.result !== null) {
+			//TODO:...
+		}
+	})
+}
+
 function doExtractMenu() {
 	g_state.dataDirty = false;
 	g_state.lastValidImgUrl = $w('#input1').value;
@@ -498,6 +539,7 @@ function doExtractMenu() {
 	$w('#button2').disable();
 	$w('#input1').disable();
 	
+	console.log(`extractedMenu url: ${imageUrl}`);
 
 	extractMenu(imageUrl)
 	.then(data => {
@@ -519,6 +561,12 @@ function doExtractMenu() {
 			return;
 		}		
 
+		g_state.extracted_sections = ["Starters", "Mains", "Sides", "Deserts"];
+
+		if(data.sections !== undefined) {
+			g_state.extracted_sections = data.sections.map((v,i) => v.texts.map((t,i) => t.text).join(' '));
+		}
+
 		let rows = rowsFromMenuData(data);
 		rows = sortRowsByMenuStructure(rows);		
 
@@ -536,7 +584,7 @@ function doExtractMenu() {
 		g_state.analayzing = false;
 		updateAllControls();
 
-		tryBuildMenuAnnotations(imageUrl);
+		// tryBuildMenuAnnotations(imageUrl);
 
 		updateAllControls();
 		
@@ -558,6 +606,9 @@ function doExtractMenu() {
 		$w('#button2').link = imageUrl;
 		$w('#button2').enable();
 		$w('#input1').enable();
+
+		tryBuildMenuAnnotations(imageUrl);
+
 		updateAllControls();
 		
 	})
@@ -622,15 +673,19 @@ function updateMenuItemFromUserSelectedRect(id, extracted) {
 		showDeleteButton: false,
 		showReproduceButton: true,
 		data: {
-			section_name:item.section_name,
+			item_name:item.item_name,
 			item_description: item.item_description,
+			section: item.section,
 			price: item.price,
 		},
+		sections:g_state.extracted_sections,
 	};
 	// console.log(JSON.stringify(context));
 	wixWindow.openLightbox("dish_editor", context)
 	.then( res => {
 		if(res !== null) {
+			console.log(`res = ${JSON.stringify(res)}`);
+			updateExtractedSections(res.section);
 			g_state.dataDirty = true;
 			let rows = $w('#table1').rows;
 			if(res.doReproduce) {
@@ -638,11 +693,13 @@ function updateMenuItemFromUserSelectedRect(id, extracted) {
 				let newRow = {
 					id: `id_${getNewRowId()}`,	
 					_color: color,			
-					_section_name: `<span style="color:${color};">${res.section_name}</span>`,				
+					_item_name: `<span style="color:${color};">${res.item_name}</span>`,				
 					_item_description: `<span style="color:${color};">${res.item_description}</span>`,
 					_price: `<span style="color:${color};">${res.price}</span>`,
-					section_name: res.section_name,
+					item_name: res.item_name,
 					item_description: res.item_description,
+					_section: `<span style="color:${color};">${res.section}</span>`,
+					section: res.section,
 					price: res.price,
 					x: item.x,
 					y: item.y,
@@ -655,11 +712,13 @@ function updateMenuItemFromUserSelectedRect(id, extracted) {
 					let color = 'Blue';
 					if(rows[i].id === id) {
 						rows[i]._color = color;
-						rows[i]._section_name = `<span style="color:${color};">${res.section_name}</span>`;					
+						rows[i]._item_name = `<span style="color:${color};">${res.item_name}</span>`;					
 						rows[i]._item_description = `<span style="color:${color};">${res.item_description}</span>`;
 						rows[i]._price = `<span style="color:${color};">${res.price}</span>`;
-						rows[i].section_name = res.section_name;
-						rows[i].item_description = res.item_description;					
+						rows[i].item_name = res.item_name;
+						rows[i].item_description = res.item_description;	
+						rows[i]._section = `<span style="color:${color};">${res.section}</span>`;
+						rows[i].section = res.section;			
 						rows[i].price = res.price;
 						rows[i].x = item.x;
 						rows[i].y = item.y;
@@ -733,10 +792,10 @@ function addMultipleNewMenuItemByUserSelectionRect(extracted) {
 					let newRow = {
 						id: `id_${getNewRowId()}`,
 						_color: color,				
-						_section_name: `<span style="color:${color};">${item.section_name}</span>`,				
+						_item_name: `<span style="color:${color};">${item.item_name}</span>`,				
 						_item_description: `<span style="color:${color};">${item.item_description}</span>`,
 						_price: `<span style="color:${color};">${item.price}</span>`,
-						section_name: item.section_name,
+						item_name: item.item_name,
 						item_description: item.item_description,
 						price: item.price,
 						x: item.x,
@@ -778,7 +837,7 @@ function isValidProductName(name) {
 }
 
 function countOfProductsWithNames(rows) {
-	return rows.filter(v => v.section_name.length > 0).length;
+	return rows.filter(v => v.item_name.length > 0).length;
 }
 
 function validateTableMenuItems() {
@@ -787,7 +846,7 @@ function validateTableMenuItems() {
 	let rows = $w('#table1').rows;
 	const productsWithName = countOfProductsWithNames(rows);
 	const productsWithNamesPercentag = productsWithName / rows.length * 100.0;
-	console.log(`productsWithNamesPercentag:${productsWithNamesPercentag} named:${productsWithName} length:${rows.length}`);
+	// console.log(`productsWithNamesPercentag:${productsWithNamesPercentag} named:${productsWithName} length:${rows.length}`);
 	for(let i=0; i<rows.length; i++) {
 		let row = rows[i];
 		let color = row._color;
@@ -800,20 +859,20 @@ function validateTableMenuItems() {
 			row._price = `<span style="font-size:11px;color:red;background:yellow;">&#9888;</span><span style="color:${color};">${row.price}</span>`
 		} 	
 
-		if(!isValidProductName(row.section_name) && row.item_description.length < 1) {
+		if(!isValidProductName(row.item_name) && row.item_description.length < 1) {
 			nameWarningCount += 2;
-			row._section_name = `<span style="font-size:11px;color:red;background:yellow;">&#9888;</span>`;
-			row._item_description = row._section_name;
+			row._item_name = `<span style="font-size:11px;color:red;background:yellow;">&#9888;</span>`;
+			row._item_description = row._item_name;
 		} else {
 			if(productsWithNamesPercentag > 50) {
-				if(isValidProductName(row.section_name)) {
-					row._section_name = `<span style="color:${color};">${row.section_name}</span>`;
+				if(isValidProductName(row.item_name)) {
+					row._item_name = `<span style="color:${color};">${row.item_name}</span>`;
 				} else {
 					nameWarningCount++;
-					row._section_name = `<span style="font-size:11px;color:red;background:yellow;">&#9888;</span><span style="color:${color};">${row.section_name}</span>`;
+					row._item_name = `<span style="font-size:11px;color:red;background:yellow;">&#9888;</span><span style="color:${color};">${row.item_name}</span>`;
 				}
 			} else {
-				row._section_name = `<span style="color:${color};">${row.section_name}</span>`;
+				row._item_name = `<span style="color:${color};">${row.item_name}</span>`;
 			}
 		}
 	}
@@ -822,8 +881,70 @@ function validateTableMenuItems() {
 	g_state.name_warnings = nameWarningCount;
 }
 
+function createSingleGroupFromItems(items) {
+	let rcLeft = Number.MAX_SAFE_INTEGER;
+	let rcRight = Number.MIN_SAFE_INTEGER;
+	let rcTop = Number.MAX_SAFE_INTEGER;
+	let rcBottom = Number.MIN_SAFE_INTEGER;
+	for(let i=0; i < items.length; i++) {
+		let item = items[i];
+		if(item.pos.x < rcLeft) rcLeft = item.pos.x;
+		if(item.pos.x + item.pos.w > rcRight) rcRight = item.pos.x + item.pos.w;
+		if(item.pos.y < rcTop) rcTop = item.pos.y;
+		if(item.pos.y + item.pos.h > rcBottom) rcBottom = item.pos.y + item.pos.h;
 
-function addNewMenuItemByUserSelectionRect(extracted) {
+		if(item.type === undefined) {
+			item.type = 'item_name';
+		}
+		if(item.text === undefined) {
+			item.text = '';
+		}
+	}
+	let poly = {x:rcLeft, y:rcTop, w:rcRight-rcLeft, h:rcBottom-rcTop};
+	// console.log(`poly: ${JSON.stringify(poly)}`);
+	// console.log(JSON.stringify(items));
+	let item_names = items.filter((v) => v.type === 'item_name').map((v) => v.text).join(' ');
+	//let item_names = items.filter((v) => v.type === 'item_name').map((v) => v.text).join(' ');
+	let item_descriptions = items.filter((v) => v.type === 'item_description').map((v) => v.text).join(' ');
+	let item_prices = items.filter((v) => v.type === 'price').map((v) => v.text).join(' ');
+
+	let group = {
+		texts: [
+			{
+				text: `${item_names} ${item_names}`,
+				type: 'item_name',
+				pos: {x:0, y:0, w:0, h:0},
+			},
+			{
+				text: item_descriptions,
+				type: 'item_description',
+				pos: {x:0, y:0, w:0, h:0},
+			},
+			{
+				text: item_prices,
+				type: 'price',
+				pos: {x:0, y:0, w:0, h:0},
+			}
+		],
+		poly: poly,
+	}
+	// console.log(JSON.stringify(group));
+	return group;
+}
+
+
+function addNewMenuItemByUserSelectionRect(_extracted) {
+	console.log(`addNewMenuItemByUserSelectionRect: ${JSON.stringify(_extracted)}`);
+	let extracted = _extracted
+	if(extracted.groups === undefined || extracted.groups.length < 1) { 
+		if(extracted.items !== undefined && extracted.items.length > 0) {			
+			let items = extracted.items;
+			let group = createSingleGroupFromItems(items);
+			extracted.groups = [group];
+			// console.log(`no groups! created single group from items: ${JSON.stringify(extracted)}`);
+		}		 
+	} 
+
 	if(extracted.groups !== undefined && extracted.groups.length > 1) {	
 		addMultipleNewMenuItemByUserSelectionRect(extracted);
 	} else if(extracted.groups !== undefined && extracted.groups.length == 1) {
@@ -838,26 +959,31 @@ function addNewMenuItemByUserSelectionRect(extracted) {
 			showReproduceButton: false,
 			title: 'Add New Dish',
 			data: {			
-				section_name:item.section_name,
+				item_name:item.item_name,
 				item_description: item.item_description,
+				section: item.section,
 				price: item.price,
 			},
+			sections: g_state.extracted_sections,
 		};
 
 		wixWindow.openLightbox("dish_editor", context)
 		.then( res => {
-			if(res !== null) {
+			if(res !== null) {				
+				updateExtractedSections(res.section);
 				g_state.dataDirty = true;
 				let rows = $w('#table1').rows;
 				let color = 'DarkGreen';
 				let newRow = {
 					id: `id_${getNewRowId()}`,
 					_color: color,				
-					_section_name: `<span style="color:${color};">${res.section_name}</span>`,				
+					_item_name: `<span style="color:${color};">${res.item_name}</span>`,				
 					_item_description: `<span style="color:${color};">${res.item_description}</span>`,
+					_section: `<span style="color:${color};">${res.section}</span>`,
 					_price: `<span style="color:${color};">${res.price}</span>`,
-					section_name: res.section_name,
+					item_name: res.item_name,
 					item_description: res.item_description,
+					section: res.section,
 					price: res.price,
 					x: item.x,
 					y: item.y,
@@ -943,7 +1069,7 @@ export function table1_rowSelect(event) {
 	g_selectedRowData = event.rowData;
 	// console.log(JSON.stringify(rowData));
 	setMenuMarkedArea(rowData.x, rowData.y, rowData.w, rowData.h);
-	//wixWindow.copyToClipboard(`${rowData.section_name} - ${rowData.item_description} - ${rowData.price}`);
+	//wixWindow.copyToClipboard(`${rowData.item_name} - ${rowData.item_description} - ${rowData.price}`);
 }
 
 /**
@@ -1006,8 +1132,8 @@ export function html1_message(event) {
 					let h= data.userSelectedRect.h;
 					let oevrlapped = checkOverlaps([data.userSelectedRect], $w('#table1').rows);
 					if(!oevrlapped) {
-						let url = `https://www.wix.com/eureka/content/img/ocr/extract?url=${imageUrl}&l=3&c=true&g=true&a=&p=${x},${y},${w},${h}`;
-						// console.log(url);
+						let url = `https://www.wix.com/eureka/content/img/ocr/extract?url=${imageUrl}&p=${x},${y},${w},${h}`;
+						console.log(url);
 						g_state.analayzing = true;
 						g_state.analayzingFailed = false;
 						updateAllControls();
@@ -1037,8 +1163,8 @@ export function html1_message(event) {
 					let h= data.userSelectedRect.h;
 					let oevrlapped = checkOverlaps([data.userSelectedRect], $w('#table1').rows);
 					if(!oevrlapped) {
-						let url = `https://www.wix.com/eureka/content/img/ocr/extract?url=${imageUrl}&l=3&c=true&g=true&a=&p=${x},${y},${w},${h}`;
-						// console.log(url);
+						let url = `https://www.wix.com/eureka/content/img/ocr/extract?url=${imageUrl}&p=${x},${y},${w},${h}`;
+						console.log(url);
 						g_state.analayzing = true;
 						g_state.analayzingFailed = false;
 						updateAllControls();
@@ -1074,13 +1200,15 @@ export function html1_message(event) {
 				$w('#button1').disable();
 				$w('#button3').disable();
 				$w('#button2').link = '';
-				$w('#button2').disable();			
+				$w('#button2').disable();	
+				$w('#button7').disable();		
 		} else if(data.msg === 'imageLoaded') {
 			if(!g_state.analayzing) {
 				$w('#button1').enable();
 				$w('#button2').link = $w('#input1').value;
 				$w('#button2').enable();
 				$w('#button3').enable();
+				$w('#button7').enable();
 			}
 		}
 	}
@@ -1094,23 +1222,27 @@ function updateSelectedRow() {
 			showDeleteButton: true,
 			showReproduceButton: true,
 			data: g_selectedRowData,
+			sections: g_state.extracted_sections,
 		}	
 		wixWindow.openLightbox("dish_editor", data)
 		.then(res => {
 			if(res !== null) {				
 				g_state.dataDirty = true;				
-				if(res.section_name === null && res.item_description === null && res.price === null) {													
+				if(res.item_name === null && res.item_description === null && res.price === null) {													
 					deleteRowFromTable(g_selectedRowData.id, res);
 				} else if(res.doReproduce) {
+					updateExtractedSections(res.section);
 					let color = 'Purple';
 					let newRow = {
 						id: `id_${getNewRowId()}`,	
 						_color: color,			
-						_section_name: `<span style="color:${color};">${res.section_name}</span>`,				
+						_item_name: `<span style="color:${color};">${res.item_name}</span>`,				
 						_item_description: `<span style="color:${color};">${res.item_description}</span>`,
+						_section: `<span style="color:${color};">${res.section}</span>`,
 						_price: `<span style="color:${color};">${res.price}</span>`,
-						section_name: res.section_name,
+						item_name: res.item_name,
 						item_description: res.item_description,
+						section: res.section,
 						price: res.price,
 						x: 0,
 						y: 0,
@@ -1121,15 +1253,18 @@ function updateSelectedRow() {
 					$w('#table1').rows = rows;
 					selectTableRowById(newRow.id);
 				} else {
+					updateExtractedSections(res.section);
 					for(let i=0; i<rows.length; i++) {
 						if(rows[i].id === g_selectedRowData.id) {
-							let color = 'DarkOrange';
+							let color = rows[i]._color === 'Black' ? 'DarkOrange' : rows[i]._color;
 							rows[i]._color = color;
-							rows[i].section_name = res.section_name;
+							rows[i].item_name = res.item_name;
 							rows[i].item_description = res.item_description;
+							rows[i].section = res.section;
 							rows[i].price = res.price;
-							rows[i]._section_name = `<span style="color:${color}">${res.section_name}</span>`;
+							rows[i]._item_name = `<span style="color:${color}">${res.item_name}</span>`;
 							rows[i]._item_description = `<span style="color:${color}">${res.item_description}</span>`;
+							rows[i]._section = `<span style="color:${color}">${res.section}</span>`;
 							rows[i]._price = `<span style="color:${color}">${res.price}</span>`;
 							$w('#table1').rows = rows;
 							$w('#table1').selectRow(i);
@@ -1185,8 +1320,9 @@ export function button4_click(event) {
 	let rows = $w('#table1').rows;
 	let exportRows = rows.map((v,i) => {
 		return {
-			item_name: v.section_name.length < 1 ? (`${v.section_name} ${v.item_description}`).trim() : v.section_name,
-			item_description: v.section_name.length < 1 ? '' : v.item_description,
+			item_name: v.item_name.length < 1 ? (`${v.item_name} ${v.item_description}`).trim() : v.item_name,
+			item_description: v.item_name.length < 1 ? '' : v.item_description,
+			section: v.section.length < 1 ? '' : v.section,
 			price: v.price,
 		}
 	});	
@@ -1256,4 +1392,42 @@ export function button6_click(event) {
 		msg: 'zoomOut',
 	};	
 	$w('#html1').postMessage(msg);
+}
+
+/**
+*	Adds an event handler that runs when an input element's value
+ is changed.
+	[Read more](https://www.wix.com/corvid/reference/$w.ValueMixin.html#onChange)
+*	 @param {$w.Event} event
+*/
+export function uploadButton1_change(event) {
+	// This function was added from the Properties & Events panel. To learn more, visit http://wix.to/UcBnC-4
+	// Add your code for this event here: 
+	// console.log(`upload:${JSON.stringify($w('#uploadButton1').value)}`);
+	$w("#uploadButton1").uploadFiles()
+      .then( (uploadedFiles) => {
+		let fileUrl = uploadedFiles[0].fileUrl;
+		fileUrl = fileUrl.replace('wix:image://v1', 'https://static.wixstatic.com/media');
+		let n = fileUrl.lastIndexOf('/');
+		fileUrl = fileUrl.substring(0, n);
+		$w('#input1').value = fileUrl;
+        $w("#input1").value = fileUrl;
+		$w('#uploadButton1').resetValidityIndication();
+      })
+      .catch( (uploadError) => {
+        console.log("File upload error: " + uploadError.errorCode);
+        console.log(uploadError.errorDescription);
+      });
+}
+
+/**
+*	Adds an event handler that runs when the element is clicked.
+	[Read more](https://www.wix.com/corvid/reference/$w.ClickableMixin.html#onClick)
+*	 @param {$w.MouseEvent} event
+*/
+export function button7_click(event) {
+	// This function was added from the Properties & Events panel. To learn more, visit http://wix.to/UcBnC-4
+	// Add your code for this event here: 
+
+	showPropertiesDialog();
 }
