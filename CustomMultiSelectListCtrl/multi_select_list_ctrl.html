@@ -1,0 +1,174 @@
+<html>
+    <head>
+    </head>
+    <style>
+    
+        .div_table {
+            display:table; 
+            table-layout: auto;       
+            width:auto; 
+        }
+        
+        .cls_fullRow {
+            border-bottom: 1px solid black;
+            background-color: white;   
+            transition: background-color .25s;
+            user-select: none;
+            -webkit-user-drag: none;
+            -moz-user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;  
+            
+            display:table-row;        
+            width:auto;        
+          }
+        .cls_fullRow:hover {
+            border-bottom: 1px solid black;
+            background-color: silver;
+            transition: background-color .25s;
+    
+            display:table-row;
+            width:auto;        
+          }
+    
+        .cls_fullRowSelected {
+            border-bottom: 1px solid black;
+            background-color: cyan;
+            transition: background-color .25s;
+            user-select: none;
+            -webkit-user-drag: none;
+            -moz-user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;   
+    
+            display:table-row;
+            width:auto
+        }
+    
+        .cls_fullRowSelected:hover {
+            border-bottom: 1px solid black;
+            background-color: darkcyan;
+            transition: background-color .25s;
+    
+            display:table-row;
+            width:auto
+        }
+
+        .cls_Col {
+            padding:5px;
+             font:normal 11px Tahoma;
+              height: 24px;
+        }
+    </style>
+    
+    <script>
+    
+        let g_cols = [];
+        let g_rows = [];
+    
+        let g_selectedRows = [];
+
+         
+    
+        function init() {
+            g_cols = [
+                {dataPath:'section', label:'Section', width:100},
+                {dataPath:'name', label:'Name', width:100},
+                {dataPath:'description', label:'Description', width:300},
+                {dataPath:'price', label:'Price', width:50},
+            ];
+    
+            //Initialize dummy data:
+            g_rows = [];
+            for(let i=0; i<100; i++) {
+                g_rows.push({section:'Startes', name:`Dish_${i}`, description:`Dish_desc_${i}`, price:'$1.99'});
+            }
+    
+            buildTable();
+        }
+    
+        function rowIndexFromId(rowId) {
+            return rowId.split('row_')[1];
+        }
+    
+        function onMouseUp(e) {
+            console.log(`onMouseUp: ctrl: ${e.ctrlKey} shift: ${e.shiftKey} t: ${e.currentTarget.id}`);
+            if(!e.ctrlKey && ! e.shiftKey) {
+                if(g_selectedRows.length === 1 && g_selectedRows[0] === e.currentTarget.id) {
+                    document.getElementById(g_selectedRows[0]).className = "cls_fullRow";
+                    g_selectedRows = [];
+                } else {
+                    g_selectedRows.forEach((v,i) => document.getElementById(v).className = "cls_fullRow" );
+                    g_selectedRows = [];
+                    let curSelectedId = e.currentTarget.id;
+                    g_selectedRows.push(e.currentTarget.id);
+                    document.getElementById(curSelectedId).className = "cls_fullRowSelected";
+                }
+            } else if(!e.ctrlKey && e.shiftKey) {
+                if(g_selectedRows.length === 0) {
+                    let curSelectedId = e.currentTarget.id;
+                    g_selectedRows.push(e.currentTarget.id);
+                    document.getElementById(curSelectedId).className = "cls_fullRowSelected";
+                } else {
+                    console.debug();
+                    let lastSelectedId = g_selectedRows[g_selectedRows.length-1];
+                    let curSelectedId = e.currentTarget.id;
+                    let index1 = rowIndexFromId(lastSelectedId);
+                    let index2 = rowIndexFromId(curSelectedId);
+                    let range = [index1, index2].sort();
+                    for(let r=range[0]; r<=range[1]; r++) {
+                        let rowId = `row_${r}`;
+                        let rowElement = document.getElementById(rowId);
+                        rowElement.className = "cls_fullRowSelected";
+                        g_selectedRows.push(rowId);
+                    }
+                }
+            } else if(e.ctrlKey && !e.shiftKey) {
+                let curSelectedId = e.currentTarget.id;
+                let curRowElement = document.getElementById(curSelectedId);
+                if(curRowElement.className === "cls_fullRowSelected") {
+                    g_selectedRows = g_selectedRows.filter((v,i) => v !== curSelectedId);
+                    curRowElement.className = "clr_fullRow";
+                } else if(curRowElement.className === "cls_fullRow") {
+                    curRowElement.className = "cls_fullRowSelected";
+                    g_selectedRows.push(curSelectedId);
+                }           
+            }
+        }
+    
+        function onMouseDblClk(e) {
+            console.log(`onMouseDblClk: ctrl: ${e.ctrlKey} shift: ${e.shiftKey} t: ${e.currentTarget.id}`);
+        }
+    
+        function buildCols(rowIdx) {    
+            let row = g_rows[rowIdx];            
+            return g_cols.map((c,ci) => {
+                return `<td class='cls_Col' style="width:${c.width};">${row[c.dataPath]}</td>`;
+            }).join('');    
+        }
+    
+        function buildRows() {
+            return g_rows.map((row, i) => {
+                return `<tr id="row_${i}" class="cls_fullRow" onmouseup="onMouseUp(event)" ondblclick="onMouseDblClk(event)">${buildCols(i)}</tr>`;
+            }).join('');
+        }
+    
+        function buildTableHeader() {
+            return `<table cellspacing="0" style='border:1px solid black; background:black; color:white;'><tr>${g_cols.map((v,i) => {return `<td class="cls_Col" style="width:${v.width}"">${v.label}</td>`}).join('')}</tr></table>`;
+        }
+    
+        function buildTable() {
+            document.getElementById('table_header').innerHTML = buildTableHeader();
+            document.getElementById('table').innerHTML = `<table  style='border:0px solid black; background:black' cellspacing="1">${buildRows()}</table>`;
+        }
+    </script>
+    
+    <body onload="init();">
+        <div id="main" style="overflow:hidden; width:auto; height:100%;">
+            <div id="table_header"></div>
+            <div id='table_container' style='overflow:auto; border:0px solid black; width:auto; height:100%'>        
+                <div id="table" class="div_table"></div>        
+            </div>
+        </div>
+    </body>
+    </html></ht>
