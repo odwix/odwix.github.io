@@ -1,3 +1,4 @@
+
 <html>
     <head>
     </head>
@@ -80,23 +81,41 @@
     
             //Initialize dummy data:
             g_rows = [];
-            for(let i=0; i<100; i++) {
+            for(let i=0; i<50; i++) {
                 g_rows.push({section:'Startes', name:`Dish_${i}`, description:`Dish_desc_${i}`, price:'$1.99'});
             }
     
             buildTable();
         }
+
+        window.onmessage = (event) => {
+            //console.log(JSON.stringify(event));
+            let eventData = event.data;
+            if(eventData.msg === 'setCols') {    
+                g_cols = eventData.cols;  
+                buildTable();         
+            } else if(eventData.msg === 'setRows') {
+                g_rows = eventData.rows;
+                g_selectedRows = [];
+                buildTable();
+            }
+        };
+         
+
+
+
+    //////////////////////////////////////////////////
     
         function rowIndexFromId(rowId) {
-            return rowId.split('row_')[1];
+            return parseInt(rowId.split('row_')[1]);
         }
     
         function onMouseUp(e) {
-            console.log(`onMouseUp: ctrl: ${e.ctrlKey} shift: ${e.shiftKey} t: ${e.currentTarget.id}`);
+            
             if(!e.ctrlKey && ! e.shiftKey) {
                 if(g_selectedRows.length === 1 && g_selectedRows[0] === e.currentTarget.id) {
                     document.getElementById(g_selectedRows[0]).className = "cls_fullRow";
-                    g_selectedRows = [];
+                    g_selectedRows = [];                
                 } else {
                     g_selectedRows.forEach((v,i) => document.getElementById(v).className = "cls_fullRow" );
                     g_selectedRows = [];
@@ -104,36 +123,33 @@
                     g_selectedRows.push(e.currentTarget.id);
                     document.getElementById(curSelectedId).className = "cls_fullRowSelected";
                 }
-            } else if(!e.ctrlKey && e.shiftKey) {
-                if(g_selectedRows.length === 0) {
-                    let curSelectedId = e.currentTarget.id;
-                    g_selectedRows.push(e.currentTarget.id);
-                    document.getElementById(curSelectedId).className = "cls_fullRowSelected";
-                } else {
-                    console.debug();
+            } else if(!e.ctrlKey && e.shiftKey) {                                   
                     let lastSelectedId = g_selectedRows[g_selectedRows.length-1];
+                    
                     let curSelectedId = e.currentTarget.id;
                     let index1 = rowIndexFromId(lastSelectedId);
+                    
                     let index2 = rowIndexFromId(curSelectedId);
-                    let range = [index1, index2].sort();
+                    let range = [index1, index2].sort((a,b) => {return a-b});
+                    console.log(range);
                     for(let r=range[0]; r<=range[1]; r++) {
                         let rowId = `row_${r}`;
                         let rowElement = document.getElementById(rowId);
                         rowElement.className = "cls_fullRowSelected";
                         g_selectedRows.push(rowId);
-                    }
-                }
+                    }                
             } else if(e.ctrlKey && !e.shiftKey) {
                 let curSelectedId = e.currentTarget.id;
                 let curRowElement = document.getElementById(curSelectedId);
                 if(curRowElement.className === "cls_fullRowSelected") {
                     g_selectedRows = g_selectedRows.filter((v,i) => v !== curSelectedId);
-                    curRowElement.className = "clr_fullRow";
+                    curRowElement.className = "cls_fullRow";
                 } else if(curRowElement.className === "cls_fullRow") {
                     curRowElement.className = "cls_fullRowSelected";
                     g_selectedRows.push(curSelectedId);
                 }           
             }
+            console.log(`onMouseUp: ctrl: ${e.ctrlKey} shift: ${e.shiftKey} t: ${e.currentTarget.id} ${g_selectedRows}`);
         }
     
         function onMouseDblClk(e) {
@@ -149,7 +165,9 @@
     
         function buildRows() {
             return g_rows.map((row, i) => {
-                return `<tr id="row_${i}" class="cls_fullRow" onmouseup="onMouseUp(event)" ondblclick="onMouseDblClk(event)">${buildCols(i)}</tr>`;
+                let clsName = g_selectedRows.find((s,i) => s === `row_${i}`) === undefined ? 'cls_fullRow' : 'cls_fullRowSelected';
+                console.log(clsName);
+                return `<tr id="row_${i}" class="${clsName}" onmouseup="onMouseUp(event)" ondblclick="onMouseDblClk(event)">${buildCols(i)}</tr>`;
             }).join('');
         }
     
@@ -171,4 +189,4 @@
             </div>
         </div>
     </body>
-    </html></ht>
+    </html> 
