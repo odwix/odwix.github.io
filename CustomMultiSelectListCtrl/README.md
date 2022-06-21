@@ -8,17 +8,40 @@ to allow almost seamless migration of your existing code.
 
 ### Usage:
 Embed this code in IFrame.
-Communicate via the window.post(msg, '\*'). See the API and Events Specifications
+Communicate by sending messages to the IFrame element by using the postMessage() method. Here's an example:
+```js
+ function selectItem() {
+    let context = {
+        msg: 'selectRow',
+        rowIndex: 17,
+    };
+    let iframe = document.getElementById('host_frame');
+    iframe.contentWindow.postMessage(context, '*');
+}
+```
+
+
 To get events from this control, register the IFrame to handle message using addEventListener for it.
+as in this example: 
+```js
+window.addEventListener(("message"), (event) => {
+    let data = event.data;
+    if(data.msg === 'onItemsSelected') {
+        console.log(data.rows);
+    } else if(data.msg === 'onDblClick') {
+        console.log(`dblClick: ${JSON.stringify(data.rows)}`);
+    }
+}, false);
+```
 
 ### API:
 #### Initializing columns
-msg = 'setCols'
-data = JSON of columns, compatible with Wix.
+- msg = 'setCols'
+- data = JSON of columns, compatible with Wix.
 
 #### Setting rows data
-msg = 'setRows'
-data = JSON of rows, compatible with Wix.
+- msg = 'setRows'
+- data = JSON of rows, compatible with Wix.
 Setting the rows will overwrite the current rows and clear the selections.
 
 A row data must include a 'id' field (just as it's forced by Wix's List) so you must generate, track and supply this id.
@@ -37,12 +60,12 @@ to the control.
 The data structure contain data of all rows that were selected by the user
 This event will be triggered when the user selects or deselects one or more rows.
 The event fields are:
-msg = 'onItemSelected'
-rows = 
+- msg = 'onItemSelected'
+- rows = 
 
 #### onDblClick
 Currently, double-clicking an item will make this item the only selected item. The item
 will be sent via notification to the host.
 The event fields are:
-msg = 'onDblClick'
-rows = The selected row data (not just the row id)
+- msg = 'onDblClick'
+- rows = The selected row data (not just the row id)
