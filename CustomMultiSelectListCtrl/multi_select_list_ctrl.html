@@ -8,6 +8,8 @@
             display:table; 
             table-layout: auto;       
             width:auto; 
+            height:100%;
+            background-color: white;
         }
         
         .cls_fullRow {
@@ -57,8 +59,8 @@
 
         .cls_Col {
             padding:5px;
-             font:normal 11px Tahoma;
-              height: 24px;
+             font:normal 9px Tahoma;
+              height: 28px;
         }
     </style>
     
@@ -82,7 +84,7 @@
             //Initialize dummy data:
             g_rows = [];
             for(let i=0; i<50; i++) {
-                g_rows.push({section:'Startes', name:`Dish_${i}`, description:`Dish_desc_${i}`, price:'$1.99'});
+g_rows.push({id: `row_${i}`, section:'Startes', name:`Dish_${i}`, description:`Dish_desc_${i}`, price:'$1.99'});
             }
     
             buildTable();
@@ -96,8 +98,24 @@
                 buildTable();         
             } else if(eventData.msg === 'setRows') {
                 g_rows = eventData.rows;
-                g_selectedRows = [];
+                // g_selectedRows = [];
+                rebuildSelectedRows();
                 buildTable();
+            } else if(eventData.msg === 'selectRow') {
+                let rowIndex = eventData.rowIndex;
+                g_selectedRows = [g_rows[rowIndex].id];
+                console.log(g_selectedRows);
+                buildTable();
+                let brc = document.getElementById(g_rows[rowIndex].id).getBoundingClientRect();
+                //console.log(`Select row bounding client rect:${JSON.stringify(brc)}`);
+                let brcc = document.getElementById('table_container').getBoundingClientRect();
+                //console.log(`table_container bounding client rect:${JSON.stringify(brcc)}`);
+
+                let st = document.getElementById('table_container').scrollTop;
+                //console.log(`table_container ScrollTop: ${JSON.stringify(st)}`);
+
+                if(brc.top < 28 || brc.top > brcc.height)
+                    document.getElementById('table_container').scrollTop = brc.top - 28;
             }
         };
          
@@ -105,40 +123,89 @@
 
 
     //////////////////////////////////////////////////
+
+        function rebuildSelectedRows() {            
+            let items = g_rows.length;
+            g_selectedRows = g_selectedRows.filter((s, i) => {
+                let found = g_rows.find((r, ri) => r.id === s);
+                return found !== undefined;
+            });            
+        }
+
+        function getLastSelectedRow() {
+            if(g_selectedRows.length > 0)
+                return g_selectedRows[g_selectedRows.length-1];
+            else 
+                return -1;
+        }
     
         function rowIndexFromId(rowId) {
-            return parseInt(rowId.split('row_')[1]);
+            //return parseInt(rowId.split('row_')[1]);
+            let index = -1;
+            for(let i=0; i<g_rows.length; i++) {
+                if(g_rows[i].id === rowId) {
+                    index = i;
+                    break;
+                }
+            }
+            return index;
+        }
+
+        function fireItemsSelected() {
+            let selectedRows = g_selectedRows.map((v,i) => {
+                let rowIndex = rowIndexFromId(v);
+                return g_rows[rowIndex];
+            })
+            let context = {
+                msg: 'onItemsSelected',
+                rows: selectedRows,
+            };
+            window.parent.postMessage(context, '*');
+        }
+
+        function fireItemDblClick(id) {            
+            let rowsIndex = rowIndexFromId(id);
+            let selectedRows = g_rows[rowsIndex];
+            let context = {
+                msg: 'onDblClick',
+                rows: selectedRows,
+            };
+            window.parent.postMessage(context, '*');
         }
     
         function onMouseUp(e) {
+            let ctrlKey = e.ctrlKey || e.metaKey;
             
-            if(!e.ctrlKey && ! e.shiftKey) {
+            if(!ctrlKey && ! e.shiftKey) {
                 if(g_selectedRows.length === 1 && g_selectedRows[0] === e.currentTarget.id) {
                     document.getElementById(g_selectedRows[0]).className = "cls_fullRow";
                     g_selectedRows = [];                
                 } else {
+                    console.log(`onMouseUp: ${g_selectedRows}`);
                     g_selectedRows.forEach((v,i) => document.getElementById(v).className = "cls_fullRow" );
                     g_selectedRows = [];
                     let curSelectedId = e.currentTarget.id;
                     g_selectedRows.push(e.currentTarget.id);
-                    document.getElementById(curSelectedId).className = "cls_fullRowSelected";
+                    document.getElementById(curSelectedId).className = "cls_fullRowSelected";                    
                 }
-            } else if(!e.ctrlKey && e.shiftKey) {                                   
-                    let lastSelectedId = g_selectedRows[g_selectedRows.length-1];
-                    
+            } else if(!ctrlKey && e.shiftKey) {                                   
+                    let lastSelectedId = getLastSelectedRow();                 
                     let curSelectedId = e.currentTarget.id;
+                    if(lastSelectedId === -1) {
+                        lastSelectedId = curSelectedId;
+                    }
                     let index1 = rowIndexFromId(lastSelectedId);
                     
                     let index2 = rowIndexFromId(curSelectedId);
                     let range = [index1, index2].sort((a,b) => {return a-b});
                     console.log(range);
                     for(let r=range[0]; r<=range[1]; r++) {
-                        let rowId = `row_${r}`;
+                        let rowId = g_rows[r].id;
                         let rowElement = document.getElementById(rowId);
                         rowElement.className = "cls_fullRowSelected";
                         g_selectedRows.push(rowId);
                     }                
-            } else if(e.ctrlKey && !e.shiftKey) {
+            } else if(ctrlKey && !e.shiftKey) {
                 let curSelectedId = e.currentTarget.id;
                 let curRowElement = document.getElementById(curSelectedId);
                 if(curRowElement.className === "cls_fullRowSelected") {
@@ -150,10 +217,14 @@
                 }           
             }
             console.log(`onMouseUp: ctrl: ${e.ctrlKey} shift: ${e.shiftKey} t: ${e.currentTarget.id} ${g_selectedRows}`);
+            fireItemsSelected();
         }
     
         function onMouseDblClk(e) {
             console.log(`onMouseDblClk: ctrl: ${e.ctrlKey} shift: ${e.shiftKey} t: ${e.currentTarget.id}`);
+            g_selectedRows = [e.currentTarget.id];
+            document.getElementById(e.currentTarget.id).className = "cls_fullRowSelected";
+            fireItemDblClick(e.currentTarget.id);
         }
     
         function buildCols(rowIdx) {    
@@ -164,10 +235,10 @@
         }
     
         function buildRows() {
-            return g_rows.map((row, i) => {
-                let clsName = g_selectedRows.find((s,i) => s === `row_${i}`) === undefined ? 'cls_fullRow' : 'cls_fullRowSelected';
-                console.log(clsName);
-                return `<tr id="row_${i}" class="${clsName}" onmouseup="onMouseUp(event)" ondblclick="onMouseDblClk(event)">${buildCols(i)}</tr>`;
+            return g_rows.map((row, ri) => {
+                let clsName = g_selectedRows.find((s,i) =>  s === g_rows[ri].id) === undefined ? 'cls_fullRow' : 'cls_fullRowSelected';
+                //console.log(`buildRows: row_${ri} ${clsName} ${g_selectedRows}`);
+                return `<tr id="${g_rows[ri].id}" class="${clsName}" onclick="onMouseUp(event)" ondblclick="onMouseDblClk(event)">${buildCols(ri)}</tr>`;
             }).join('');
         }
     
@@ -181,12 +252,15 @@
         }
     </script>
     
-    <body onload="init();">
-        <div id="main" style="overflow:hidden; width:auto; height:100%;">
-            <div id="table_header"></div>
-            <div id='table_container' style='overflow:auto; border:0px solid black; width:auto; height:100%'>        
-                <div id="table" class="div_table"></div>        
-            </div>
-        </div>
+    <body onload="init();">        
+            
+            <div id="main" style="position:fixed; top:28px; left:0; overflow:auto; width:100%; height:100%;">   
+                <div id="table_header" style="position:fixed; top:0; left:0; width:auto; height:28px;"></div>         
+                <div id='table_container' style='background-color:white; overflow:auto; border:0px solid black; width:100%; height:100%;'>       
+                    <div id="table" class="div_table"></div> 
+                    <div style="height:48px;"></div>                      
+                </div>
+            </div>  
+        
     </body>
     </html> 
