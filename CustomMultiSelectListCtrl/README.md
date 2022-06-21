@@ -21,6 +21,10 @@ msg = 'setRows'
 data = JSON of rows, compatible with Wix.
 Setting the rows will overwrite the current rows and clear the selections.
 
+A row data must include a 'id' field (just as it's forced by Wix's List) so you must generate, track and supply this id.
+A simple technique for generating a unique ID it to use a global counter variable that increases its value by 1 whenever a new item is created.
+
+
 #### Getting rows data
 It is impossible to just get data from the control since it's implemented in an IFrame.
 Your rows data must be kept and managed in your own code.
@@ -29,9 +33,16 @@ to the control.
 
 ### Events:
 
-#### onSelectChanged
+#### onItemSelected
 The data structure contain data of all rows that were selected by the user
 This event will be triggered when the user selects or deselects one or more rows.
+The event fields are:
+msg = 'onItemSelected'
+rows = 
 
 #### onDblClick
-TBD
+Currently, double-clicking an item will make this item the only selected item. The item
+will be sent via notification to the host.
+The event fields are:
+msg = 'onDblClick'
+rows = The selected row data (not just the row id)
