@@ -27,7 +27,8 @@
           }
         .cls_fullRow:hover {
             border-bottom: 1px solid black;
-            background-color: silver;
+            background-color: #e6e6e6;
+            opacity: 1;
             transition: background-color .25s;
     
             display:table-row;
@@ -36,7 +37,8 @@
     
         .cls_fullRowSelected {
             border-bottom: 1px solid black;
-            background-color: cyan;
+            background-color: #c3ffc3;
+            opacity: 1;
             transition: background-color .25s;
             user-select: none;
             -webkit-user-drag: none;
@@ -50,7 +52,8 @@
     
         .cls_fullRowSelected:hover {
             border-bottom: 1px solid black;
-            background-color: darkcyan;
+            background-color: #95c3d1;
+            opacity: 1;
             transition: background-color .25s;
     
             display:table-row;
@@ -113,6 +116,8 @@ g_rows.push({id: `row_${i}`, section:'Startes', name:`Dish_${i}`, description:`D
 
                 let st = document.getElementById('table_container').scrollTop;
                 //console.log(`table_container ScrollTop: ${JSON.stringify(st)}`);
+
+                fireItemsSelected();
 
                 if(brc.top < 28 || brc.top > brcc.height)
                     document.getElementById('table_container').scrollTop = brc.top - 28;
