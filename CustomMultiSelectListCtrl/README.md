@@ -54,6 +54,11 @@ Your rows data must be kept and managed in your own code.
 You can modify the rows however you like, and update the list control by sending the rows data
 to the control.
 
+#### Select row
+Select a row in the list.
+- msg = 'selectRow'
+- rowIndex = the row index (not the row id)
+
 ### Events:
 
 #### onItemSelected
