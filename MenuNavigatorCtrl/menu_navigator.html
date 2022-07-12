@@ -564,7 +564,7 @@
                             g_areasData[i].x === g_markedArea.x &&
                             g_areasData[i].y ===g_markedArea.y &&
                             g_areasData[i].w === g_markedArea.w &&
-                            g_areasData[i].h === g_markedArea.h &&
+                            g_areasData[i].h === g_markedArea.h ||
                             g_markedMultiAreas.find((v) => v.x === g_areasData[i].x && v.y === g_areasData[i].y && v.w === g_areasData[i].w && v.h === g_areasData[i].h) !== undefined
                             )) {
                                 drawFrame(g_offscreenCanvas, g_areasData[i].x, g_areasData[i].y, g_areasData[i].w, g_areasData[i].h, "#0000ffff","#0000ff1a");
