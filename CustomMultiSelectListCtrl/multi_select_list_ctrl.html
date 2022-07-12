@@ -190,8 +190,11 @@ g_rows.push({id: `row_${i}`, section:'Startes', name:`Dish_${i}`, description:`D
                     g_selectedRows.forEach((v,i) => document.getElementById(v).className = "cls_fullRow" );
                     g_selectedRows = [];
                     let curSelectedId = e.currentTarget.id;
-                    g_selectedRows.push(e.currentTarget.id);
-                    document.getElementById(curSelectedId).className = "cls_fullRowSelected";                    
+                    let alreadySelected = g_selectedRows.find(v => v === curSelectedId) !== undefined;
+                    if(!alreadySelected) {
+                        g_selectedRows.push(e.currentTarget.id);
+                        document.getElementById(curSelectedId).className = "cls_fullRowSelected"; 
+                    }                   
                 }
             } else if(!ctrlKey && e.shiftKey) {                                   
                     let lastSelectedId = getLastSelectedRow();                 
@@ -208,7 +211,10 @@ g_rows.push({id: `row_${i}`, section:'Startes', name:`Dish_${i}`, description:`D
                         let rowId = g_rows[r].id;
                         let rowElement = document.getElementById(rowId);
                         rowElement.className = "cls_fullRowSelected";
-                        g_selectedRows.push(rowId);
+                        let alreadySelected = g_selectedRows.find(v => v === rowId) !== undefined;
+                        if(!alreadySelected) {
+                            g_selectedRows.push(rowId);
+                        }   
                     }                
             } else if(ctrlKey && !e.shiftKey) {
                 let curSelectedId = e.currentTarget.id;
@@ -218,7 +224,10 @@ g_rows.push({id: `row_${i}`, section:'Startes', name:`Dish_${i}`, description:`D
                     curRowElement.className = "cls_fullRow";
                 } else if(curRowElement.className === "cls_fullRow") {
                     curRowElement.className = "cls_fullRowSelected";
-                    g_selectedRows.push(curSelectedId);
+                    let alreadySelected = g_selectedRows.find(v => v === curSelectedId) !== undefined;
+                    if(!alreadySelected) {
+                        g_selectedRows.push(curSelectedId); 
+                    }
                 }           
             }
             console.log(`onMouseUp: ctrl: ${e.ctrlKey} shift: ${e.shiftKey} t: ${e.currentTarget.id} ${g_selectedRows}`);
