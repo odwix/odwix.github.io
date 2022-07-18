@@ -121,6 +121,11 @@ g_rows.push({id: `row_${i}`, section:'Startes', name:`Dish_${i}`, description:`D
 
                 if(brc.top < 28 || brc.top > brcc.height)
                     document.getElementById('table_container').scrollTop = brc.top - 28;
+            } else if(eventData.msg === 'selectRows') {
+                g_selectedRows = eventData.rowsIndices;
+                rebuildSelectedRows();
+                buildTable();
+                fireItemsSelected();
             }
         };
          
