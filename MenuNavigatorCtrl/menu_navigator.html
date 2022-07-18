@@ -156,7 +156,8 @@
 
         
             function notifySelectedArea(command, event) {
-                if((g_areasData.length > 0 || g_wordsInfo.length > 0) && g_menuImage !== null) {                                   
+                if((g_areasData.length > 0 || g_wordsInfo.length > 0) && g_menuImage !== null) {  
+                    let ctrlKey = event.ctrlKey || event.metaKey;                                 
                     let i = areaIndexFromMousePos();
                     let areadDataValid = i > -1;    
                     const [rcLeft, rcTop, rcRight, rcBottom] = getSelectedWordsBoundingRect();  
@@ -171,7 +172,8 @@
                             y: userSelectedRectValid ? parseInt(rcTop) : -1,
                             w: userSelectedRectValid ? parseInt(rcRight - rcLeft) : -1,
                             h: userSelectedRectValid ? parseInt(rcBottom - rcTop) : -1,
-                        }
+                        },
+                        appendMode: ctrlKey,
                     }
                     //console.log(`mouseup selected id: ${msg.areaData.id}`);
                     
