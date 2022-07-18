@@ -29,6 +29,9 @@ let g_state = {
 	rows: [],
 	multi_selected_row_data: [],
 	extract_job_id: -1,
+	extract_polling_counter: 0,
+	extract_last_status: '',
+	extract_operation_time_limit: 30, 
 }
 
 let g_selectedRowData = null;
@@ -182,6 +185,16 @@ function selectCustomTableRow(i) {
 	let context = {
 		msg: 'selectRow',
 		rowIndex: i,
+	};
+
+	$w('#html2').postMessage(context);
+}
+
+function selectCustomTableRows() {	
+	let indices = g_state.multi_selected_row_data.map(v => v.id);
+	let context = {
+		msg: 'selectRows',
+		rowsIndices: indices,
 	};
 
 	$w('#html2').postMessage(context);
@@ -411,6 +424,15 @@ function selectTableRowById(id) {
 			g_state.multi_selected_row_data = [g_selectedRowData];
 			
 			return;
+		}
+	}
+}
+
+function getTableRowIndexById(id) {
+	let rows = g_state.rows;
+	for(let i=0; i<rows.length; i++) {
+		if(rows[i].id === id) {
+			return i;
 		}
 	}
 }
@@ -691,16 +713,69 @@ function doExtractMenuAsync() {
 	startExtractMenu(imageUrl)
 	.then(res => {
 		g_state.extract_job_id = res.id;
+		g_state.extract_polling_counter = 0;
+		g_state.extract_last_status = '';
 		tryFetchExtractMenuResults();
 	});
 }
 
 function tryFetchExtractMenuResults() {
 	if(g_state.extract_job_id !== -1) {
+		
+		
 		fetchExtractMenu(g_state.extract_job_id)
 		.then(res => {
-			$w('#text1').text = `Menu extraction in progress - ${res.status} ...`;
-			if(res.status !== 'done') {
+			if(res === undefined || res === null) {
+				g_state.analayzing = false;
+				g_state.analayzingFailed = true;
+				g_state.analyzingFailedMsgLine = 'Something went wrong... Please try again.';				
+				updateAllControls();
+				return;
+			}
+
+			const anim = ['[>---------]', '[->--------]', '[-->-------]', '[--->------]', '[---->-----]', '[----->----]', '[------>---]', '[------->--]', '[-------->-]', '[--------->]'];
+			let anim_char = '';
+			if(res.status === g_state.extract_last_status) {
+				//anim_char =  anim[g_state.extract_polling_counter % anim.length];
+				anim_char = anim[parseInt(g_state.extract_polling_counter/g_state.extract_operation_time_limit * anim.length)];
+				g_state.extract_polling_counter++;
+			} else {
+				g_state.extract_last_status = res.status;
+				g_state.extract_polling_counter = 0;
+			}
+			
+			$w('#text1').text = `Menu extraction - ${res.status} - in progress... ${anim_char} ${g_state.extract_polling_counter > 0 ? `timeout in: ${g_state.extract_operation_time_limit - g_state.extract_polling_counter + 1}sec.` : ''}`;
+			
+			if(g_state.extract_polling_counter >= g_state.extract_operation_time_limit) {
+				
+				updateAllControls();
+				let title = `<p style="padding:5px; border:1px solid black; color:white; background:DarkBlue; border-radius:3px; font-weight:bold;">Analysis step "${res.status}" needs more time...</p>`;
+				let msg = `<div style="padding:5px; font-size: 16px;"><div>Apply for ${g_state.extract_operation_time_limit} more seconds?</div><div style="padding-top:25px;">[Note: Clicking No will abort the whole analysis]</div></div>`;
+				doModal_YesNoDialog(title, msg)
+				.then(res => {
+					if(res.result) {
+						g_state.extract_polling_counter = 0;
+						g_state.extract_last_status = '';
+						setTimeout(tryFetchExtractMenuResults, 1000);
+					} else {
+						g_state.analayzing = false;
+						g_state.analayzingFailed = true;
+						g_state.analyzingFailedMsgLine = 'Image analysis took too long... - aborted';
+						updateAllControls();
+					}
+				})
+			} else if(res.status === undefined || res.status === null) {
+				g_state.analayzing = false;
+				g_state.analayzingFailed = true;
+				g_state.analyzingFailedMsgLine = 'Image analysis aborted (no status)';
+				updateAllControls();
+			}else if(res.status === 'error') {
+				g_state.analayzing = false;
+				g_state.analayzingFailed = true;
+				g_state.analyzingFailedMsgLine = 'Failed to analyze image';
+				updateAllControls();
+				
+			} else if(res.status !== 'done') {				
 				setTimeout(tryFetchExtractMenuResults, 1000);
 			} else {
 				g_state.analayzing = false;
@@ -1358,14 +1433,22 @@ export function input1_input(event) {
 export function html1_message(event) {
 	// This function was added from the Properties & Events panel. To learn more, visit http://wix.to/UcBnC-4
 	// Add your code for this event here: 
-	// console.log('htmlevent handler');
 	if(event.data !== undefined ) {
 		let data = event.data;
 		if(data.msg === 'areaSelected') {
 			if(data.areaDataValid) {
 				let areaData = data.areaData;
-				// console.log(areaData.id);
-				selectTableRowById(areaData.id);
+				if(data.appendMode) {
+					let exist = g_state.multi_selected_row_data.find(v => v.id === areaData.id);
+					if(exist === undefined) {
+						g_state.multi_selected_row_data.push(areaData);
+					} else {						
+						g_state.multi_selected_row_data = g_state.multi_selected_row_data.filter(v => v.id !== areaData.id);
+					}					
+					selectCustomTableRows();
+				} else {
+					selectTableRowById(areaData.id);
+				}
 				if(data.userSelectedRectValid) {
 					// console.log(`update item<${areaData.id}> from user rect: ${JSON.stringify(data.userSelectedRect)}`);
 					//TODO: if data.userSelectedRectValid - call rescan menu with the coords and update the item with the returned values.
@@ -1451,7 +1534,7 @@ export function html1_message(event) {
 				
 				updateAllControls();
 			}
-		}
+		} 		 
 	}
 }
 
@@ -1699,8 +1782,10 @@ export function html2_message(event) {
 			g_state.analayzingFailed = false;
 
 			let selectedRows = data.rows;
-			let rowData = selectedRows[selectedRows.length-1];			
+			let rowData = data.rows;			
 			g_selectedRowData = rowData;
+			clearMenuMarkArea();
+			setMenuMarkedArea(rowData.x, rowData.y, rowData.w, rowData.h);
 
 			updateAllControls();		
 			updateSelectedRow();	
